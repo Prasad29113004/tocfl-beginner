@@ -6,6 +6,7 @@ A static Traditional Chinese study app for a complete beginner preparing for TOC
 
 - 25 sequenced lessons: 12 A1 foundations and 13 A2 lessons, with original examples, pinyin, translations, core words and grammar notes
 - A searchable word-card deck with topic filters, browser audio, quick recall and local known-word tracking
+- Pinyin lesson with a five-tone chart, 21-initial and common-final sound charts, and an interactive five-sound tone listening drill
 - 25 sentence models with Taiwan Mandarin speech playback and optional microphone recording for shadowing
 - Ten-question A1 and A2 mixed listening/reading drills with immediate explanations
 - An original 50-question Band A practice simulation: 25 listening and 25 reading questions, with 30 minutes per section and answer review at the end

@@ -61,3 +61,47 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 @media(max-width:900px){.practice-modes{grid-template-columns:1fr 1fr}.featured-mode{grid-column:1/-1}.readiness-grid{grid-template-columns:1fr}}
 @media(max-width:740px){.exam-format{grid-template-columns:1fr}.level-summary{grid-template-columns:1fr}.practice-modes{grid-template-columns:1fr}.featured-mode{grid-column:auto}.result-breakdown{grid-template-columns:1fr 1fr}.quiz-head{gap:10px}.quiz-head span:last-child{text-align:right}.quiz-prompt{font-size:18px}}
 
+/* Pinyin and tone study */
+.hero .text-link{display:inline-flex;align-items:center;gap:6px;padding:10px 4px;color:#f2e4c7;font-weight:700}
+.hero .text-link:hover{color:#fff;text-decoration:underline;text-underline-offset:4px}
+.pinyin-studio{padding:22px;margin-bottom:26px}
+.pinyin-intro{display:grid;grid-template-columns:1fr auto;align-items:center;gap:18px;padding-bottom:17px;border-bottom:1px solid var(--line)}
+.pinyin-intro h2{font:500 25px var(--serif);margin:0 0 5px}
+.pinyin-intro p,.tone-explainer>p,.chart-details>p,.tone-practice p{font-size:10px;color:#78857c;margin:0}
+.syllable-model{min-width:170px;display:grid;justify-items:center;gap:2px;padding:12px 18px;background:#eff1e7;border-radius:10px}
+.syllable-model b{font:34px var(--serif);color:var(--green)}
+.syllable-model span{font:10px var(--mono);color:#61745f}
+.syllable-model small{font-size:10px;color:#879188}
+.tone-explainer{padding:17px 0}
+.tone-explainer h3,.tone-practice h3{font:500 19px var(--serif);margin:0 0 4px}
+.tone-cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:11px}
+.tone-card{position:relative;min-height:122px;display:grid;justify-items:center;align-content:center;gap:3px;border:1px solid #e2e4d9;background:#f6f5ed;border-radius:10px;padding:12px 6px;color:var(--ink)}
+.tone-card:hover,.sound-card:hover{border-color:#93a98b;background:#eef2e9}
+.tone-card>b{font:27px var(--serif);color:var(--green)}
+.tone-card>strong{font:17px var(--serif)}
+.tone-card>small{font-size:9px;color:#78857c;text-align:center}
+.tone-number{position:absolute;top:7px;left:9px;color:#a66a48;font:10px var(--mono)}
+.pinyin-charts{display:grid;gap:8px}
+.chart-details{padding:12px 13px;border:1px solid var(--line);border-radius:9px;background:#fbfaf6}
+.chart-details summary{cursor:pointer;color:#42634c;font-size:11px;font-weight:700}
+.chart-details>p{margin:9px 0}
+.sound-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:6px}
+.sound-card{display:grid;grid-template-columns:1fr auto;align-items:center;text-align:left;gap:1px 5px;border:1px solid #e5e6dc;background:#f5f4ec;border-radius:7px;padding:7px;color:inherit}
+.sound-card>span{font:12px var(--mono);color:#547452}
+.sound-card>b{grid-column:2;grid-row:1/3;font:19px var(--serif);color:var(--green)}
+.sound-card>small{font-size:8px;color:#849087}
+.sandhi-note{display:grid;gap:4px;margin-top:12px;padding:11px 13px;border-left:3px solid #d4a35e;border-radius:6px;background:#f7f0e3}
+.sandhi-note b{font:9px var(--mono);letter-spacing:.05em;color:#95633e;text-transform:uppercase}
+.sandhi-note span{font-size:10px;color:#6f786d}
+.tone-practice{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-top:16px;padding:14px;background:#eef1e8;border-radius:9px}
+.tone-practice .kicker{margin:0 0 3px}
+.tone-practice p{margin:0}
+.tone-question{max-width:620px;margin:13px auto 0;padding:15px;border:1px solid var(--line);border-radius:10px;background:#f7f6ef}
+.tone-audio{display:block;margin:12px auto}
+.tone-options{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tone-result{display:flex;justify-content:center;align-items:center;gap:10px;margin:12px auto 0;padding:12px;background:#f6f2e6;border-radius:9px}
+.tone-result>b{font:24px var(--serif);color:var(--green)}
+.tone-result>span{font-size:10px;color:#728076}
+.pinyin-section-head{margin-top:28px}
+@media(max-width:740px){.pinyin-studio{padding:15px}.pinyin-intro{grid-template-columns:1fr}.syllable-model{justify-self:start;min-width:0}.tone-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.tone-card:last-child{grid-column:1/-1}.tone-practice{align-items:flex-start;flex-direction:column}.tone-result{flex-wrap:wrap}.sound-grid{grid-template-columns:repeat(auto-fill,minmax(92px,1fr))}}
+
