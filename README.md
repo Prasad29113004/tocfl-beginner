@@ -15,7 +15,7 @@ A static Traditional Chinese study app for a complete beginner preparing for TOC
 
 ## Important scope
 
-The in-app vocabulary deck is a curated supplement, not the complete official TOCFL vocabulary list. Use the official list linked below and study all vocabulary relevant to your target level. The practice questions are original study material, not official TOCFL questions. The timed set is fixed and half length; it is not a computer adaptive test (CAT) and does not reproduce adaptive question selection. This app does not calculate official scaled scores or guarantee a passing result. Check the current test format, registration information and score rules with TOCFL.
+The in-app vocabulary deck is a curated supplement, not the complete official TOCFL vocabulary list. Use the official list linked below and study all vocabulary relevant to your target level. The practice questions are original study material, not official TOCFL questions. The timed set is a short, fixed 25+25 set; it is not a computer adaptive test (CAT) and does not reproduce adaptive question selection. This app does not calculate official scaled scores or guarantee a passing result. Check the current test format, registration information and score rules with TOCFL.
 
 Audio uses a Chinese (Taiwan) voice supplied by the visitor's browser or operating system when available. Voice availability and quality vary by device. The app does not grade pronunciation. Microphone recording is requested only after pressing Record; recordings stay in the browser tab. Progress is stored in local storage on this device.
 
