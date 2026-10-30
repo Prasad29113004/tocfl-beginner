@@ -105,3 +105,41 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .pinyin-section-head{margin-top:28px}
 @media(max-width:740px){.pinyin-studio{padding:15px}.pinyin-intro{grid-template-columns:1fr}.syllable-model{justify-self:start;min-width:0}.tone-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.tone-card:last-child{grid-column:1/-1}.tone-practice{align-items:flex-start;flex-direction:column}.tone-result{flex-wrap:wrap}.sound-grid{grid-template-columns:repeat(auto-fill,minmax(92px,1fr))}}
 
+/* Beginner grammar guide and fuller sound practice */
+.pinyin-notes,.sound-practice{margin-top:10px;padding:16px}
+.pinyin-notes h3,.sound-practice h3,.score-guidance h4{font:500 19px var(--serif);margin:3px 0 9px}
+.note-grid,.coverage-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.note-grid p,.coverage-grid p{margin:0;padding:10px;border-radius:8px;background:#f2f2e9;color:#778279;font-size:10px}
+.note-grid b,.coverage-grid b{color:#365f47}
+.pinyin-notes>.note{margin-top:10px;font-size:10px!important}
+.sound-practice{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;background:#f7f6ef}
+.sound-practice p{font-size:10px;color:#78857c;margin:0}
+.sound-drill-buttons{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#soundQuizArea{grid-column:1/-1}
+.grammar-level-note{display:flex;gap:10px;align-items:center;margin:0 0 16px;padding:11px 14px;background:#eef1e8;border-radius:9px;color:#647568;font-size:10px}
+.grammar-level-note b{color:#365f47;font:11px var(--mono);white-space:nowrap}
+.grammar-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.grammar-card{padding:13px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.grammar-card-top{display:flex;justify-content:space-between;align-items:center}
+.grammar-card-top>small{font:9px var(--mono);color:#9a9f94}
+.grammar-card h3{font:500 17px var(--serif);margin:9px 0 5px}
+.grammar-shape{padding:6px 8px;border-radius:6px;background:#f0f1e8;color:#41674d;font:10px var(--mono)}
+.grammar-card>p{min-height:45px;color:#778279;font-size:10px;margin:9px 0}
+.grammar-example{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px;background:#f7f6ef;border-radius:7px}
+.grammar-example>div{display:grid;gap:2px;min-width:0}
+.grammar-example b{font:15px/1.45 var(--serif)}
+.grammar-example small{font:9px var(--mono);color:#829087}
+.grammar-example em{font-style:normal;font-size:9px;color:#66766b}
+.grammar-quiz-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px}
+.grammar-question{padding:13px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+.grammar-question h3{font:500 15px/1.45 var(--serif);margin:8px 0}
+.grammar-question .answers{gap:5px}
+.grammar-question .answer{font-size:10px;padding:8px}
+.grammar-question .feedback{min-height:14px}
+.score-guidance{margin-top:14px;padding:11px;background:#f7f6ef;border-radius:8px}
+.score-guidance h4{font-size:16px;margin:0 0 5px}
+.score-guidance p{font-size:9px;color:#78857c;margin:7px 0 0}
+.coverage-grid{margin:8px 0}
+@media(max-width:900px){.grammar-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:740px){.note-grid,.coverage-grid,.grammar-grid,.grammar-quiz-grid{grid-template-columns:1fr}.sound-practice{grid-template-columns:1fr}.sound-drill-buttons{justify-content:flex-start}.grammar-card>p{min-height:0}.score-guidance{overflow-x:auto}.grammar-level-note{align-items:flex-start;flex-direction:column}}
+
