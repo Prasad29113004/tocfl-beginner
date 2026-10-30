@@ -1,6 +1,12 @@
 const DATA = window.TOCFL;
 const LESSONS = DATA.lessons;
 const VOCAB = [];
+let OFFICIAL_VOCAB = [];
+let OFFICIAL_KNOWN = new Set();
+try {
+  OFFICIAL_VOCAB = JSON.parse(localStorage.getItem('tocflOfficialWords') || '[]');
+  OFFICIAL_KNOWN = new Set(JSON.parse(localStorage.getItem('tocflOfficialKnown') || '[]'));
+} catch (_) { OFFICIAL_VOCAB = []; OFFICIAL_KNOWN = new Set(); }
 const vocabSeen = new Set();
 LESSONS.forEach((lesson, lessonIndex) => lesson.words.split(';').forEach((entry) => {
   const [h, p, m, c] = entry.split('|');
@@ -66,11 +72,12 @@ const GRAMMAR_QUIZ = [
 ];
 const SECTIONS = ['Listening', 'Reading'];
 const LABELS = { home:'OVERVIEW', lessons:'LEARNING PATH', grammar:'GRAMMAR GUIDE', words:'WORD CARDS', practice:'PINYIN & SOUNDS', exam:'EXAM PRACTICE', progress:'MY PROGRESS' };
-const defaultState = { version:2, done:[], known:[], days:[], bestFull:0, bestA1:0, bestA2:0, lastScore:null, view:'home' };
+const defaultState = { version:3, done:[], known:[], days:[], bestFull:0, bestA1:0, bestA2:0, lastScore:null, view:'home' };
 let state = defaultState;
 try {
   const saved = JSON.parse(localStorage.getItem('islandStudyProgress') || 'null');
-  if (saved && saved.version === 2) state = Object.assign({}, defaultState, saved);
+  if (saved && saved.version === 3) state = Object.assign({}, defaultState, saved);
+  else if (saved && saved.version === 2) state = Object.assign({}, defaultState, saved, { version:3, bestFull:0, lastScore:null });
   else if (saved && Array.isArray(saved.days)) state.days = saved.days;
 } catch (_) {}
 let flashIndex = 0;
@@ -130,7 +137,7 @@ function pageHome() {
   const nextIndex = LESSONS.findIndex((_, index) => !state.done.includes(index));
   const next = LESSONS[nextIndex < 0 ? 0 : nextIndex];
   const remembered = state.known.length;
-  return '<section class="hero"><div class="hero-copy"><div class="eyebrow">FROM YOUR FIRST WORD TO BAND A</div><h1>Start at zero.<br><em>Build a Taiwan-ready ear.</em></h1><p>A calm, step-by-step Traditional Chinese course. Learn the foundations first, then move through A1 and A2 with sentence audio, grammar, recall practice and original exam-style questions.</p><div class="actions"><button class="button primary" data-go="lessons">Start the A1 path →</button><a class="text-link" href="#exam" data-go="exam">Explore the exam plan <span aria-hidden="true">→</span></a></div></div></section><div class="stats"><div class="stat"><i>▤</i><div><strong>'+state.done.length+' / 25</strong><small>lessons finished</small></div></div><div class="stat"><i>◫</i><div><strong>'+remembered+' / '+VOCAB.length+'</strong><small>core words marked known</small></div></div><div class="stat"><i>◷</i><div><strong>'+state.days.length+'</strong><small>study days logged</small></div></div></div><div class="section-head"><div><h2>Your route through Band A</h2><p>12 A1 units, then 13 A2 units. Take the lessons in order.</p></div><button class="link-button" data-go="lessons">All 25 lessons →</button></div><div class="grid-path">'+LESSONS.slice(0,4).map((lesson,index) => '<button class="path" data-open="'+index+'"><span class="numb">0'+(index+1)+'</span><span><strong>'+esc(lesson.title)+'</strong><small>'+lesson.level+' · '+esc(lesson.goal)+'</small></span><span class="arrow">↗</span></button>').join('')+'</div><div class="daily"><div><strong>Next lesson: '+esc(next.title)+'</strong><div class="track"><i style="width:'+progressPercent()+'%"></i></div><p>'+esc(next.goal)+'</p></div><div class="tip"><small>HOW TO USE THIS COURSE</small><blockquote>Listen · read · recall · repeat</blockquote><small>Play every sentence aloud, then shadow it slowly.</small></div></div><section class="card readiness"><div class="kicker">A COMPLETE STUDY ROUTE NEEDS MORE THAN AN APP</div><h3>Use these three parts together</h3><div class="readiness-grid"><p><b>1. Learn the foundations</b><br>Complete the A1 units, then A2. Review grammar and use the word cards and sentence shelf every day.</p><p><b>2. Practise exam timing</b><br>Try the 25-question-per-section timed practice set and review every missed answer.</p><p><b>3. Check official materials</b><br>Study the official vocabulary list and sample tests. They are linked on the Exam page.</p></div></section>';
+  return '<section class="hero"><div class="hero-copy"><div class="eyebrow">FROM YOUR FIRST WORD TO BAND A</div><h1>Start at zero.<br><em>Build a Taiwan-ready ear.</em></h1><p>A calm, step-by-step Traditional Chinese course. Learn the foundations first, then move through A1 and A2 with sentence audio, grammar, recall practice and original exam-style questions.</p><div class="actions"><button class="button primary" data-go="lessons">Start the A1 path →</button><a class="text-link" href="#exam" data-go="exam">Explore the exam plan <span aria-hidden="true">→</span></a></div></div></section><div class="stats"><div class="stat"><i>▤</i><div><strong>'+state.done.length+' / 25</strong><small>lessons finished</small></div></div><div class="stat"><i>◫</i><div><strong>'+remembered+' / '+VOCAB.length+'</strong><small>course words marked known</small></div></div><div class="stat"><i>◷</i><div><strong>'+state.days.length+'</strong><small>study days logged</small></div></div></div><div class="section-head"><div><h2>Your route through Band A</h2><p>12 A1 units, then 13 A2 units. Take the lessons in order.</p></div><button class="link-button" data-go="lessons">All 25 lessons →</button></div><div class="grid-path">'+LESSONS.slice(0,4).map((lesson,index) => '<button class="path" data-open="'+index+'"><span class="numb">0'+(index+1)+'</span><span><strong>'+esc(lesson.title)+'</strong><small>'+lesson.level+' · '+esc(lesson.goal)+'</small></span><span class="arrow">↗</span></button>').join('')+'</div><div class="daily"><div><strong>Next lesson: '+esc(next.title)+'</strong><div class="track"><i style="width:'+progressPercent()+'%"></i></div><p>'+esc(next.goal)+'</p></div><div class="tip"><small>HOW TO USE THIS COURSE</small><blockquote>Listen · read · recall · repeat</blockquote><small>Play every sentence aloud, then shadow it slowly.</small></div></div><section class="card readiness"><div class="kicker">A COMPLETE STUDY ROUTE NEEDS MORE THAN AN APP</div><h3>Use these three parts together</h3><div class="readiness-grid"><p><b>1. Learn the foundations</b><br>Complete the A1 units, then A2. Review grammar and use the word cards and sentence shelf every day.</p><p><b>2. Practise exam timing</b><br>Try the 35-question-per-section timed practice set and review every missed answer.</p><p><b>3. Check official materials</b><br>Study the official vocabulary list and sample tests. They are linked on the Exam page.</p></div></section>';
 }
 function pageLessons() {
   let html = '<div class="page-head"><div><div class="kicker">25 UNITS · A1 FOUNDATION → A2</div><h1>Learn it in layers.</h1><p>Open a unit, study the pattern, play the example and mark it complete when you can use it without looking.</p></div><span class="pill">'+state.done.length+' / 25 complete</span></div><div class="level-summary"><div><span class="level-tag a1">A1</span><b>'+levelDone('A1')+' / 12</b><small>Basic familiar phrases and everyday needs</small></div><div><span class="level-tag a2">A2</span><b>'+levelDone('A2')+' / 13</b><small>Short conversations, messages and connected ideas</small></div></div>';
@@ -147,17 +154,34 @@ function pageLessons() {
   return html+'<section class="card note-card"><h3>Study at a steady pace</h3><p>One lesson at a time works well. Review older words in between new units. The test organization lists recommended study-hour ranges by level and learning environment; use its current guidance alongside your own pace.</p><button class="text-link" data-go="exam">See official study links →</button></section>';
 }
 function wordCard(word) {
-  return '<article class="word '+(state.known.includes(word.id)?'learned':'')+'"><div class="category">'+esc(word.c)+' · '+LESSONS[word.lesson].level+'</div><div class="hanzi">'+esc(word.h)+'</div><div class="pinyin">'+esc(word.p)+'</div><div class="meaning">'+esc(word.m)+'</div><div class="word-actions"><button class="icon" data-say="'+esc(word.h)+'" aria-label="Play word">♫</button><button class="icon" data-known="'+word.id+'" aria-label="Toggle known">'+(state.known.includes(word.id)?'✓':'＋')+'</button></div></article>';
+  const official = word.source === 'official';
+  const known = official ? OFFICIAL_KNOWN.has(word.key) : state.known.includes(word.id);
+  const label = official ? 'Official '+word.level : word.c+' · '+LESSONS[word.lesson].level;
+  const lookup = official ? '<a class="word-lookup" href="https://translate.google.com/?sl=zh-TW&amp;tl=en&amp;text='+encodeURIComponent(word.h)+'&amp;op=translate" target="_blank" rel="noreferrer">Look up English meaning ↗</a>' : '';
+  const detail = official ? ([word.pos,word.context].filter(Boolean).join(' · ')||'Official TOCFL vocabulary') : word.m;
+  return '<article class="word '+(known?'learned':'')+'"><div class="category">'+esc(label)+'</div><div class="hanzi">'+esc(word.h)+'</div><div class="pinyin">'+esc(word.p)+'</div><div class="meaning">'+esc(detail)+'</div>'+lookup+'<div class="word-actions"><button class="icon" data-say="'+esc(word.h)+'" aria-label="Play word">♫</button>'+(official?'<button class="icon" data-official-known="'+esc(word.key)+'" aria-label="Toggle known">'+(known?'✓':'＋')+'</button>':'<button class="icon" data-known="'+word.id+'" aria-label="Toggle known">'+(known?'✓':'＋')+'</button>')+'</div></article>';
+}
+function currentWordScope() { return document.querySelector('[data-word-scope].active')?.dataset.wordScope || 'course'; }
+function filteredWords() {
+  const scope=currentWordScope();
+  const category=document.querySelector('.filter.active[data-cat]')?.dataset.cat||'All';
+  const query=(document.getElementById('wordSearch')?.value||'').toLowerCase().trim();
+  const source=scope==='course'?VOCAB:OFFICIAL_VOCAB.filter(word=>word.level===scope);
+  return source.filter(word=>(scope!=='course'||category==='All'||word.c===category)&&(word.h+word.p+word.m+word.c+(word.context||'')+(word.pos||'')).toLowerCase().includes(query));
 }
 function pageWords() {
   const categories = ['All', ...new Set(VOCAB.map(word=>word.c))];
-  return '<div class="page-head"><div><div class="kicker">CORE DECK · '+VOCAB.length+' UNIQUE WORDS</div><h1>Make the words familiar.</h1><p>Traditional characters, pinyin, meaning and Taiwan Mandarin audio. Mark a word known when you can recall it.</p></div><input class="search" id="wordSearch" placeholder="Search words…"></div><div class="source important-source"><b>Coverage note:</b> this is a curated course deck, not the complete official vocabulary list. Use the official list from the Exam page to check every word for your target level.</div><div class="flash"><div class="flash-copy"><div class="eyebrow">QUICK RECALL</div><h3>One word at a time</h3><p>Say the meaning before you reveal it.</p></div><div class="flash-word" id="flashWord">'+esc(VOCAB[flashIndex]?.h||'你好')+'</div><button class="smallbtn" id="reveal">Reveal</button><button class="smallbtn" id="nextWord">Next →</button></div><div class="filter-row">'+categories.map((category,index)=>'<button class="filter '+(!index?'active':'')+'" data-cat="'+esc(category)+'">'+esc(category)+'</button>').join('')+'</div><div class="words" id="wordGrid">'+VOCAB.map(wordCard).join('')+'</div>';
+  const count = level => OFFICIAL_VOCAB.filter(word=>word.level===level).length;
+  const knownCount = OFFICIAL_VOCAB.filter(word=>OFFICIAL_KNOWN.has(word.key)).length;
+  const scopes = [['course','Course deck ('+VOCAB.length+')'],['Novice 1','Novice 1 ('+count('Novice 1')+')'],['Novice 2','Novice 2 ('+count('Novice 2')+')'],['A1','A1 / Level 1 ('+count('A1')+')'],['A2','A2 / Level 2 ('+count('A2')+')']];
+  const status = OFFICIAL_VOCAB.length ? 'Loaded '+OFFICIAL_VOCAB.length+' official words in this browser · '+knownCount+' marked known.' : 'Import the official workbook to add its Novice 1, Novice 2, Level 1 (A1) and Level 2 (A2) vocabulary here.';
+  return '<div class="page-head"><div><div class="kicker">'+VOCAB.length+' COURSE WORDS · OFFICIAL LIST IMPORT</div><h1>Make the words familiar.</h1><p>Study the lesson deck or import the official TOCFL workbook for level-tagged vocabulary and local recall tracking.</p></div><input class="search" id="wordSearch" placeholder="Search words…"></div><section class="card official-import"><div class="kicker">FULL BAND A VOCABULARY</div><h3>Import the official word list</h3><p>Download the official ZIP, extract it, then select the included Excel workbook. Import needs an internet connection to load the spreadsheet reader. Your file is read in this browser and is never sent to the site. The workbook gives traditional characters, pinyin, topic and part of speech where listed; each imported card links to an English lookup.</p><div class="official-import-actions"><a class="button secondary" href="https://tocfl.edu.tw/tocfl/assets/files/vocabulary/8000zhuyin_202409.zip" target="_blank" rel="noreferrer">Download official workbook ZIP ↗</a><input id="officialVocabFile" type="file" accept=".xlsx,.xls" aria-label="Choose the official TOCFL workbook"><button class="button primary" id="importOfficialVocab">Import levels</button>'+(OFFICIAL_VOCAB.length?'<button class="smallbtn" id="clearOfficialVocab">Remove imported list</button>':'')+'</div><p class="status" id="officialImportStatus">'+esc(status)+'</p></section><div class="word-scope-row">'+scopes.map((item,index)=>'<button class="filter '+(!index?'active':'')+'" data-word-scope="'+esc(item[0])+'">'+esc(item[1])+'</button>').join('')+'</div><div class="filter-row" id="topicFilters">'+categories.map((category,index)=>'<button class="filter '+(!index?'active':'')+'" data-cat="'+esc(category)+'">'+esc(category)+'</button>').join('')+'</div><div class="flash"><div class="flash-copy"><div class="eyebrow">QUICK RECALL</div><h3>One word at a time</h3><p>Say the meaning or topic before you reveal it.</p></div><div class="flash-word" id="flashWord">'+esc(VOCAB[flashIndex]?.h||'你好')+'</div><button class="smallbtn" id="reveal">Reveal</button><button class="smallbtn" id="nextWord">Next →</button></div><div class="word-count" id="wordCount">Showing '+VOCAB.length+' words</div><div class="words" id="wordGrid">'+VOCAB.map(wordCard).join('')+'</div>';
 }
 function pinyinSoundCard(item) {
   return '<button class="sound-card" data-say="'+esc(item.hanzi)+'"><span>'+esc(item.sound)+'</span><b>'+esc(item.hanzi)+'</b><small>'+esc(item.pinyin)+' · '+esc(item.meaning)+'</small></button>';
 }
 function pagePinyinExtras() {
-  return '<section class="card pinyin-notes"><div class="kicker">HOW TO READ THE CHART</div><h3>Vowels, initials and spelling rules</h3><div class="note-grid"><p><b>Vowel shapes</b><br>a is open; i is a high front vowel; u is high and rounded; ü keeps the tongue position of i while rounding the lips. Tap each final card to hear it in a real word.</p><p><b>Air matters</b><br>b/d/g are unaspirated sounds; p/t/k release a stronger puff of air. Hold your hand near your mouth to feel the difference.</p><p><b>ü spelling</b><br>After j, q and x, the two dots are omitted: ju, qu, xu are pronounced with ü. After n and l, keep them: nǚ, lǜ.</p><p><b>Tone marks</b><br>Mark a or e when present; in ou the mark goes above o. Otherwise mark the last vowel: hǎo, liú, guì. Neutral syllables have no mark.</p></div><p class="note">Pinyin uses y and w to spell some syllables with no consonant initial, for example yī (衣), wǔ (五), and yuè (月). The sound and spelling charts are learning guides, not a complete list of every possible syllable.</p></section><section class="card sound-practice"><div><div class="kicker">SOUND RECOGNITION</div><h3>Hear an initial or a final</h3><p>Listen to a sample word, then identify its starting sound or vowel ending. The answer appears after you choose.</p></div><div class="sound-drill-buttons"><button class="button secondary" data-sound-start="initial">Practise initials →</button><button class="button secondary" data-sound-start="final">Practise finals →</button></div><div id="soundQuizArea"></div></section>';
+  return '<section class="card pinyin-notes"><div class="kicker">HOW TO READ THE CHART</div><h3>Vowels, initials and spelling rules</h3><div class="note-grid"><p><b>Vowel shapes</b><br>a is open; i is a high front vowel; u is high and rounded; ü keeps the tongue position of i while rounding the lips. Tap each final card to hear it in a real word.</p><p><b>Air matters</b><br>b/d/g are unaspirated sounds; p/t/k release a stronger puff of air. Hold your hand near your mouth to feel the difference.</p><p><b>ü spelling</b><br>After j, q and x, the two dots are omitted: ju, qu, xu are pronounced with ü. After n and l, keep them: nǚ, lǜ.</p><p><b>Tone marks</b><br>Mark a or e when present; in ou the mark goes above o. Otherwise mark the last vowel: hǎo, liú, guì. Neutral syllables have no mark.</p><p><b>Changing tones in speech</b><br>Two third tones together usually make the first rise: nǐ hǎo sounds like ní hǎo. 不 is commonly bú before a fourth tone, as in bú shì. 一 often changes tone before another syllable, as in yí ge and yì tiān.</p><p><b>The written i has two sounds</b><br>After zh, ch, sh, r, z, c and s, i is a special vowel sound. Compare shì (是) with yī (衣).</p></div><p class="note">Pinyin uses y and w to spell some syllables with no consonant initial, for example yī (衣), wǔ (五), and yuè (月). The sound and spelling charts are learning guides, not a complete list of every possible syllable.</p></section><section class="card sound-practice"><div><div class="kicker">SOUND RECOGNITION</div><h3>Hear an initial or a final</h3><p>Listen to a sample word, then identify its starting sound or vowel ending. The answer appears after you choose.</p></div><div class="sound-drill-buttons"><button class="button secondary" data-sound-start="initial">Practise initials →</button><button class="button secondary" data-sound-start="final">Practise finals →</button></div><div id="soundQuizArea"></div></section>';
 }
 function startSoundQuiz(group) {
   const source=group==='initial'?INITIALS:FINALS;
@@ -239,11 +263,11 @@ function renderPhrases(level) {
 function pageExam() {
   return `<div class="page-head"><div><div class="kicker">EXAM FORMAT · OFFICIAL MATERIALS · PRACTICE</div><h1>Prepare for both<br>A1 and A2.</h1><p>This course labels its two beginner stages A1 and A2. TOCFL reports these outcomes as Level 1 (入門級) and Level 2 (基礎級). The current computer adaptive test can present questions from across levels and estimates your ability as you answer.</p></div><span class="pill">Original practice · not official items</span></div>
   <section class="card exam-format"><div><h3>Know the current test format</h3><p>TOCFL's computer adaptive Listening and Reading test is not restricted to one band. It selects items based on your answers, so the question difficulty can change during the test.</p><table class="table"><tr><th>CAT SECTION</th><th>APPROX. QUESTIONS</th><th>TIME</th></tr><tr><td>Listening 聽力</td><td>35</td><td>50 minutes</td></tr><tr><td>Reading 閱讀</td><td>35</td><td>60 minutes</td></tr></table><div class="callout"><b>Listening:</b> the CAT gives about 10 seconds to answer each item. <b>Reading:</b> pace yourself and answer at least 25 items; too few answered can trigger a score adjustment. Check official guidance for the test type and location you book.</div><div class="score-guidance"><h4>Official CAT certificate thresholds</h4><table class="table"><tr><th>OUTCOME</th><th>TOTAL</th><th>LISTENING MIN.</th><th>READING MIN.</th></tr><tr><td>Level 1</td><td>710</td><td>335</td><td>340</td></tr><tr><td>Level 2</td><td>885</td><td>395</td><td>415</td></tr></table><p>These are official scaled CAT certificate scores. The site’s quiz counts correct answers and cannot convert them to TOCFL scores or predict a result. Check official single-section cutoffs separately.</p></div></div><div class="official-links"><h3>Official preparation</h3><a href="https://tocfl.edu.tw/tocfl/index.php/teach/test/page/1" target="_blank" rel="noreferrer">Free sample tests and audio ↗</a><a href="https://tocfl.edu.tw/tocfl/index.php/teach/download" target="_blank" rel="noreferrer">Official vocabulary list and downloads ↗</a><a href="https://tocfl.edu.tw/tocfl/index.php/test/cat/list/2" target="_blank" rel="noreferrer">Current CAT format and question types ↗</a><a href="https://tocfl.edu.tw/tocfl/index.php/sign_up/rule/list/1" target="_blank" rel="noreferrer">Current scoring and certificate rules ↗</a></div></section>
-  <section class="card study-guidance"><h3>What this study room covers</h3><div class="coverage-grid"><p><b>Listening</b><br>Short utterances, questions and replies, conversations, and mini passages with browser audio.</p><p><b>Reading</b><br>Sentence meaning, notices, messages, paragraph completion, and word choice in context.</p><p><b>Language foundations</b><br>Traditional characters, core vocabulary, grammar patterns, pinyin initials, finals, tones, and sentence shadowing.</p></div><p>The included set has 25 original listening and 25 original reading items. It is a short, fixed practice set with a 30-minute timer per section; it is not the full CAT and does not adapt its questions.</p></section>
-  <div class="section-head"><div><h2>Choose your practice</h2><p>Short drills give explanations right away. The timed set saves feedback until the end.</p></div></div><div class="practice-modes"><article class="mode-card"><span class="level-tag a1">A1</span><h3>A1 skills drill</h3><p>10 mixed listening and reading questions with immediate explanations.</p><button class="button secondary" data-mode="A1">Start A1 drill →</button></article><article class="mode-card"><span class="level-tag a2">A2</span><h3>A2 skills drill</h3><p>10 mixed questions on plans, past events, comparisons, messages and more.</p><button class="button secondary" data-mode="A2">Start A2 drill →</button></article><article class="mode-card featured-mode"><span class="level-tag">25 + 25</span><h3>Timed practice set</h3><p>25 listening + 25 reading questions. 30 minutes per section for this custom practice set.</p><button class="button primary" data-mode="full">Start timed practice →</button></article></div><section class="card study-guidance"><h3>Use a readiness checklist</h3><ul><li>Finish the A1 units, then the A2 units, and use the Grammar guide and Pinyin &amp; sounds sections.</li><li>Study the complete official vocabulary list for your target level; the in-app word deck is a curated supplement.</li><li>Take the official sample tests with their audio, then practise under timed conditions.</li><li>Review wrong answers and replay audio until you understand the key detail.</li></ul><p>Practice scores here are raw results on original questions. They are not official scaled scores, certificate thresholds or a guarantee of passing.</p></section><div id="quizArea"></div>`;
+  <section class="card study-guidance"><h3>What this study room covers</h3><div class="coverage-grid"><p><b>Listening</b><br>Single utterances, questions and replies, short conversations, announcements, and mini passages with browser audio.</p><p><b>Reading</b><br>Sentence meaning, notices, messages, menus, timetables, paragraph comprehension, cloze, and word choice in context.</p><p><b>Language foundations</b><br>Traditional characters, official level vocabulary import, 22 grammar patterns, pinyin initials and finals, tones, and sentence shadowing.</p></div><p>The included set has 35 original listening and 35 original reading items with 50 and 60 minute timers. It is fixed practice, not the adaptive CAT; use the official sample tests as well.</p></section>
+  <div class="section-head"><div><h2>Choose your practice</h2><p>Short drills give explanations right away. The timed set saves feedback until the end.</p></div></div><div class="practice-modes"><article class="mode-card"><span class="level-tag a1">A1</span><h3>A1 skills drill</h3><p>10 mixed listening and reading questions with immediate explanations.</p><button class="button secondary" data-mode="A1">Start A1 drill →</button></article><article class="mode-card"><span class="level-tag a2">A2</span><h3>A2 skills drill</h3><p>10 mixed questions on plans, past events, comparisons, messages and more.</p><button class="button secondary" data-mode="A2">Start A2 drill →</button></article><article class="mode-card featured-mode"><span class="level-tag">35 + 35</span><h3>Timed practice set</h3><p>35 listening + 35 reading questions. 50 and 60 minutes for this fixed practice set.</p><button class="button primary" data-mode="full">Start timed practice →</button></article></div><section class="card study-guidance"><h3>Use a readiness checklist</h3><ul><li>Finish the A1 units, then the A2 units, and use the Grammar guide and Pinyin &amp; sounds sections.</li><li>Import the official vocabulary workbook in Word Cards, then mark words known as you learn them.</li><li>Take the official sample tests with their audio, then practise under timed conditions.</li><li>Review wrong answers and replay audio until you understand the key detail.</li></ul><p>Practice scores here are raw results on original questions. They are not official scaled scores, certificate thresholds or a guarantee of passing.</p></section><div id="quizArea"></div>`;
 }
 function pageProgress() {
-  const fullScore = state.bestFull ? state.bestFull+'/50' : '—';
+  const fullScore = state.bestFull ? state.bestFull+'/70' : '—';
   return '<div class="page-head"><div><div class="kicker">YOUR JOURNEY, SAVED ON THIS DEVICE</div><h1>Small steps add up.</h1><p>Lesson progress, known words and practice records stay in this browser.</p></div><button class="button secondary" data-go="lessons">Continue learning →</button></div><div class="two-col"><section class="card"><h3>Course progress</h3><div class="result-score">'+progressPercent()+'%</div><div class="track"><i style="width:'+progressPercent()+'%"></i></div><div class="progress-level"><b>A1 · '+levelDone('A1')+'/12</b><div class="track"><i style="width:'+(levelDone('A1')/12*100)+'%"></i></div></div><div class="progress-level"><b>A2 · '+levelDone('A2')+'/13</b><div class="track"><i style="width:'+(levelDone('A2')/13*100)+'%"></i></div></div>'+LESSONS.map((lesson,index)=>'<p class="progress-row">'+(state.done.includes(index)?'✓':'○')+'　<span>'+lesson.level+' · '+esc(lesson.title)+'</span></p>').join('')+'</section><section class="card"><h3>Study snapshot</h3><p>'+state.known.length+' core words marked known · '+state.days.length+' study days</p><div class="score-grid"><div><b>A1 drill</b><strong>'+(state.bestA1||'—')+'/10</strong></div><div><b>A2 drill</b><strong>'+(state.bestA2||'—')+'/10</strong></div><div><b>Timed practice set</b><strong>'+fullScore+'</strong></div></div><p>These are practice results, not official scaled scores.</p><button class="clear" id="clearProgress">Reset saved progress</button></section></div>';
 }
 function draw() {
@@ -275,7 +299,7 @@ function startQuiz(mode) {
     selected = shuffle(levelPool.filter(q=>q.section==='Listening')).slice(0,5).concat(shuffle(levelPool.filter(q=>q.section==='Reading')).slice(0,5));
     selected = shuffle(selected);
   }
-  quiz = {mode,questions:selected,index:0,answers:[],answered:false,deadline:mode==='full'?Date.now()+30*60*1000:null,phase:'Listening'};
+  quiz = {mode,questions:selected,index:0,answers:[],answered:false,deadline:mode==='full'?Date.now()+50*60*1000:null,phase:'Listening'};
   logDay();
   renderQuestion();
   if (mode==='full') quizClock=setInterval(tickClock,1000);
@@ -285,14 +309,14 @@ function tickClock() {
   const item = quiz.questions[quiz.index];
   if (!item) return;
   const desired = item.section;
-  if (desired !== quiz.phase) { quiz.phase=desired; quiz.deadline=Date.now()+30*60*1000; }
+  if (desired !== quiz.phase) { quiz.phase=desired; quiz.deadline=Date.now()+(desired==='Listening'?50:60)*60*1000; }
   const remaining = Math.max(0,Math.ceil((quiz.deadline-Date.now())/1000));
   const timer = document.getElementById('examTimer');
   if (timer) timer.textContent = String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0');
   if (remaining === 0) {
     if (quiz.phase==='Listening') {
       while (quiz.index < quiz.questions.length && quiz.questions[quiz.index].section==='Listening') { if (!(quiz.index in quiz.answers)) quiz.answers[quiz.index]=null; quiz.index++; }
-      if (quiz.index < quiz.questions.length) { quiz.phase='Reading'; quiz.deadline=Date.now()+30*60*1000; renderQuestion(); }
+      if (quiz.index < quiz.questions.length) { quiz.phase='Reading'; quiz.deadline=Date.now()+60*60*1000; renderQuestion(); }
       else finishQuiz();
     } else {
       while (quiz.index < quiz.questions.length) { if (!(quiz.index in quiz.answers)) quiz.answers[quiz.index]=null; quiz.index++; }
@@ -315,7 +339,7 @@ function renderQuestion() {
   const question = quiz.questions[quiz.index];
   const timed = quiz.mode==='full';
   const title = timed ? 'TIMED PRACTICE SET' : question.level+' DRILL';
-  area.innerHTML = '<div class="quiz"><div class="quiz-head"><span>QUESTION '+(quiz.index+1)+' OF '+quiz.questions.length+'</span><span>'+title+(timed?' · '+question.section.toUpperCase()+' <b id="examTimer">30:00</b>':'')+'</span></div><div class="quiz-card">'+questionMeta(question)+'<div class="answers">'+question.options.map((option,index)=>'<button class="answer" data-answer="'+index+'" '+(quiz.answered?'disabled':'')+'>'+esc(option)+'</button>').join('')+'</div><div class="feedback" id="feedback"></div><div class="quiz-actions">'+(timed?'<button class="smallbtn" id="skipQuestion">Skip</button>':'')+'<button id="quizNext" class="button secondary" '+(quiz.answered?'':'disabled')+'>'+(quiz.index===quiz.questions.length-1?'Finish':'Next →')+'</button></div></div></div>';
+  area.innerHTML = '<div class="quiz"><div class="quiz-head"><span>QUESTION '+(quiz.index+1)+' OF '+quiz.questions.length+'</span><span>'+title+(timed?' · '+question.section.toUpperCase()+' <b id="examTimer">'+(question.section==='Listening'?'50:00':'60:00')+'</b>':'')+'</span></div><div class="quiz-card">'+questionMeta(question)+'<div class="answers">'+question.options.map((option,index)=>'<button class="answer" data-answer="'+index+'" '+(quiz.answered?'disabled':'')+'>'+esc(option)+'</button>').join('')+'</div><div class="feedback" id="feedback"></div><div class="quiz-actions">'+(timed?'<button class="smallbtn" id="skipQuestion">Skip</button>':'')+'<button id="quizNext" class="button secondary" '+(quiz.answered?'':'disabled')+'>'+(quiz.index===quiz.questions.length-1?'Finish':'Next →')+'</button></div></div></div>';
   if (timed) tickClock();
 }
 function chooseAnswer(index) {
@@ -338,7 +362,7 @@ function nextQuestion() {
   quiz.answered=false;
   if (quiz.mode==='full' && quiz.index < quiz.questions.length && quiz.questions[quiz.index].section!==quiz.phase) {
     quiz.phase=quiz.questions[quiz.index].section;
-    quiz.deadline=Date.now()+30*60*1000;
+    quiz.deadline=Date.now()+(quiz.questions[quiz.index].section==='Listening'?50:60)*60*1000;
   }
   renderQuestion();
 }
@@ -360,7 +384,7 @@ function finishQuiz() {
   logDay();
   const missed=quiz.questions.map((question,index)=>({question,index})).filter(({question,index})=>quiz.answers[index]!==question.answer);
   const summary=quiz.mode==='full'
-    ? '<div class="result-breakdown"><div><b>Listening</b><strong>'+result.bySection.Listening.right+'/25</strong></div><div><b>Reading</b><strong>'+result.bySection.Reading.right+'/25</strong></div><div><b>A1 items</b><strong>'+result.A1+'/'+quiz.questions.filter(q=>q.level==='A1').length+'</strong></div><div><b>A2 items</b><strong>'+result.A2+'/'+quiz.questions.filter(q=>q.level==='A2').length+'</strong></div></div>'
+    ? '<div class="result-breakdown"><div><b>Listening</b><strong>'+result.bySection.Listening.right+'/'+result.bySection.Listening.total+'</strong></div><div><b>Reading</b><strong>'+result.bySection.Reading.right+'/'+result.bySection.Reading.total+'</strong></div><div><b>A1 items</b><strong>'+result.A1+'/'+quiz.questions.filter(q=>q.level==='A1').length+'</strong></div><div><b>A2 items</b><strong>'+result.A2+'/'+quiz.questions.filter(q=>q.level==='A2').length+'</strong></div></div>'
     : '<p>'+quiz.mode+' mixed drill · '+result.correct+' correct out of '+quiz.questions.length+'.</p>';
   const review=missed.length?'<details class="review-list"><summary>Review '+missed.length+' missed or skipped question'+(missed.length===1?'':'s')+'</summary>'+missed.map(({question,index})=>'<article><b>'+question.level+' · '+question.section+' · '+esc(question.type)+'</b><p>'+esc(question.ask)+'</p><p><strong>Answer: '+esc(question.options[question.answer])+'</strong><br>'+esc(question.why)+'</p></article>').join('')+'</details>':'<p>Excellent recall on this set. Continue with the official sample materials for another check.</p>';
   const modeLabel=quiz.mode==='full'?'TIMED PRACTICE SET COMPLETE':quiz.mode+' DRILL COMPLETE';
@@ -369,11 +393,53 @@ function finishQuiz() {
   save();
 }
 function filterWords() {
+  const scope=currentWordScope();
   const category=document.querySelector('.filter.active[data-cat]')?.dataset.cat||'All';
-  const query=(document.getElementById('wordSearch')?.value||'').toLowerCase();
-  const filtered=VOCAB.filter(word=>(category==='All'||word.c===category)&&(word.h+word.p+word.m+word.c).toLowerCase().includes(query));
+  const filtered=filteredWords();
+  const topicFilters=document.getElementById('topicFilters');
+  if(topicFilters)topicFilters.hidden=scope!=='course';
   const grid=document.getElementById('wordGrid');
   if (grid) grid.innerHTML=filtered.map(wordCard).join('')||'<p class="empty-state">No matching words. Try another search.</p>';
+  const count=document.getElementById('wordCount');
+  if(count)count.textContent='Showing '+filtered.length+' words'+(scope==='course'&&category!=='All'?' in '+category:'');
+  const flash=document.getElementById('flashWord');
+  if(flash)flash.textContent=filtered[flashIndex]?.h||'No matching words';
+}
+async function importOfficialVocabulary() {
+  const file=document.getElementById('officialVocabFile')?.files?.[0];
+  const status=document.getElementById('officialImportStatus');
+  if(!file){if(status)status.textContent='Choose the extracted Excel workbook first.';return;}
+  if(status)status.textContent='Reading the workbook in this browser…';
+  try {
+    const XLSX=await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs');
+    const workbook=XLSX.read(await file.arrayBuffer());
+    const specs=[{match:/novice\s*1/i,level:'Novice 1'},{match:/novice\s*2/i,level:'Novice 2'},{match:/level\s*1/i,level:'A1'},{match:/level\s*2/i,level:'A2'}];
+    const imported=new Map();
+    const foundLevels=new Set();
+    for(const name of workbook.SheetNames){
+      const spec=specs.find(item=>item.match.test(name));
+      if(!spec)continue;
+      foundLevels.add(spec.level);
+      const rows=XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,raw:false,defval:''});
+      rows.slice(1).forEach((row,index)=>{
+        const context=String(row[0]||'').trim(),h=String(row[1]||'').trim();
+        const p=String(row[2]||'').trim().replace(/ă/g,'ǎ').replace(/ĕ/g,'ě').replace(/ĭ/g,'ǐ').replace(/ŏ/g,'ǒ').replace(/ŭ/g,'ǔ');
+        const pos=String(row[3]||'').trim();
+        if(h&&p){const key=spec.level+'|'+h;if(!imported.has(key))imported.set(key,{source:'official',key,level:spec.level,h,p,context,pos,c:spec.level,m:''});else{const prior=imported.get(key);prior.context=[...new Set([prior.context,context].filter(Boolean))].join(' · ');prior.pos=[...new Set([prior.pos,pos].filter(Boolean))].join(' / ');if(prior.p!==p)prior.p=[...new Set([prior.p,p])].join(' · ');}}
+      });
+    }
+    if(!['Novice 1','Novice 2','A1','A2'].every(level=>foundLevels.has(level))||imported.size<100)throw new Error('The selected workbook is missing a required level sheet. Extract the ZIP and choose the 20240923 Excel workbook.');
+    OFFICIAL_VOCAB=[...imported.values()];
+    localStorage.setItem('tocflOfficialWords',JSON.stringify(OFFICIAL_VOCAB));
+    const totals=['Novice 1','Novice 2','A1','A2'].map(level=>level+': '+OFFICIAL_VOCAB.filter(word=>word.level===level).length).join(' · ');
+    if(status)status.textContent='Imported '+OFFICIAL_VOCAB.length+' words. '+totals+' · Stored on this device.';
+    document.querySelectorAll('[data-word-scope]').forEach(button=>button.classList.toggle('active',button.dataset.wordScope==='A1'));
+    flashIndex=0;
+    filterWords();
+    logDay();
+  } catch(error) {
+    if(status)status.textContent=error.message||'The workbook could not be read. Check your internet connection and try again.';
+  }
 }
 async function startRecording() {
   const status=document.getElementById('audioStatus');
@@ -458,6 +524,14 @@ document.body.addEventListener('click',async event=>{
   if(target){const index=Number(target.dataset.done);if(!state.done.includes(index))state.done.push(index);logDay();draw();toast('Lesson complete — 好棒！');return;}
   target=event.target.closest('[data-known]');
   if(target){const id=Number(target.dataset.known);state.known=state.known.includes(id)?state.known.filter(value=>value!==id):state.known.concat(id);logDay();draw();return;}
+  target=event.target.closest('[data-official-known]');
+  if(target){const key=target.dataset.officialKnown;if(OFFICIAL_KNOWN.has(key))OFFICIAL_KNOWN.delete(key);else OFFICIAL_KNOWN.add(key);localStorage.setItem('tocflOfficialKnown',JSON.stringify([...OFFICIAL_KNOWN]));logDay();filterWords();return;}
+  target=event.target.closest('#importOfficialVocab');
+  if(target){await importOfficialVocabulary();return;}
+  target=event.target.closest('#clearOfficialVocab');
+  if(target&&confirm('Remove the imported official word list and its recall marks from this browser?')){OFFICIAL_VOCAB=[];OFFICIAL_KNOWN.clear();localStorage.removeItem('tocflOfficialWords');localStorage.removeItem('tocflOfficialKnown');draw();return;}
+  target=event.target.closest('[data-word-scope]');
+  if(target){document.querySelectorAll('[data-word-scope]').forEach(button=>button.classList.toggle('active',button===target));document.querySelectorAll('[data-cat]').forEach((button,index)=>button.classList.toggle('active',index===0));flashIndex=0;filterWords();return;}
   target=event.target.closest('[data-cat]');
   if(target){document.querySelectorAll('[data-cat]').forEach(button=>button.classList.toggle('active',button===target));filterWords();return;}
   target=event.target.closest('[data-phrase-level]');
@@ -467,8 +541,8 @@ document.body.addEventListener('click',async event=>{
   if(event.target.closest('[data-answer]')){chooseAnswer(Number(event.target.closest('[data-answer]').dataset.answer));return;}
   if(event.target.closest('#quizNext')){nextQuestion();return;}
   if(event.target.closest('#skipQuestion')){if(quiz){if (!(quiz.index in quiz.answers)) quiz.answers[quiz.index]=null;nextQuestion();}return;}
-  if(event.target.closest('#reveal')){const word=VOCAB[flashIndex];document.getElementById('flashWord').innerHTML=esc(word.h)+'<small>'+esc(word.p)+' · '+esc(word.m)+'</small>';return;}
-  if(event.target.closest('#nextWord')){flashIndex=(flashIndex+1)%VOCAB.length;document.getElementById('flashWord').textContent=VOCAB[flashIndex].h;return;}
+  if(event.target.closest('#reveal')){const word=filteredWords()[flashIndex];if(word)document.getElementById('flashWord').innerHTML=esc(word.h)+'<small>'+esc(word.p)+' · '+esc(word.source==='official'?([word.pos,word.context].filter(Boolean).join(' · ')||'Official TOCFL vocabulary'):word.m)+'</small>';return;}
+  if(event.target.closest('#nextWord')){const deck=filteredWords();if(deck.length){flashIndex=(flashIndex+1)%deck.length;document.getElementById('flashWord').textContent=deck[flashIndex].h;}return;}
   if(event.target.closest('#listenFirst')){const phrase=document.querySelector('.sentence-list .sentence');if(phrase)speak(phrase.querySelector('strong').textContent);return;}
   if(event.target.closest('#recordStart')){await startRecording();return;}
   if(event.target.closest('#recordStop')){stopRecording();return;}
