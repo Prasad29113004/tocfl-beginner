@@ -76,10 +76,26 @@ const defaultState = { version:3, done:[], known:[], days:[], bestFull:0, bestA1
 let state = defaultState;
 try {
   const saved = JSON.parse(localStorage.getItem('islandStudyProgress') || 'null');
-  if (saved && saved.version === 3) state = Object.assign({}, defaultState, saved);
-  else if (saved && saved.version === 2) state = Object.assign({}, defaultState, saved, { version:3, bestFull:0, lastScore:null });
-  else if (saved && Array.isArray(saved.days)) state.days = saved.days;
+  if (saved && (saved.version === 3 || saved.version === 2 || Array.isArray(saved.days))) {
+    const candidate=saved.version===2?Object.assign({},defaultState,saved,{version:3,bestFull:0,lastScore:null}):Object.assign({},defaultState,saved,{version:3});
+    const clean=normalizedSnapshot(candidate,OFFICIAL_VOCAB,[...OFFICIAL_KNOWN]);
+    state=clean.state;
+    OFFICIAL_VOCAB=clean.words;
+    OFFICIAL_KNOWN=new Set(clean.known);
+  }
 } catch (_) {}
+let cloudUser = null;
+let cloudConfigured = Boolean(window.TOCFLCloud?.configured());
+let cloudLoadedUser = '';
+let cloudLoadingUser = '';
+let cloudRevision = 0;
+let cloudStatusText = cloudConfigured ? 'Checking account…' : 'Cloud sign-in is not connected. Progress stays in this browser until a database is configured.';
+let cloudRecoveryMode = false;
+let cloudLastSnapshot = '';
+let cloudSaveTimer = null;
+let cloudSaving = false;
+let cloudSaveQueued = false;
+const localOwnerKey = 'tocflProgressOwner';
 let flashIndex = 0;
 let quiz = null;
 let toneQuiz = null;
@@ -96,6 +112,7 @@ function save() {
   try { localStorage.setItem('islandStudyProgress', JSON.stringify(state)); } catch (_) {}
   const count = document.getElementById('lessonCount');
   if (count) count.textContent = state.done.length + '/25';
+  queueCloudSave();
 }
 function logDay() {
   const day = new Date().toLocaleDateString('en-CA');
@@ -129,7 +146,8 @@ function normalizeProgressBackup(backup) {
   const last=saved.lastScore;
   const lastScore=last&&validModes.includes(last.mode)&&Number.isInteger(last.score)&&Number.isInteger(last.total)&&typeof last.date==='string'
     ?{mode:last.mode,score:score(last.score,70),total:score(last.total,70),date:last.date.slice(0,40)}:null;
-  const restoredState={version:3,done:uniqueIndexes(saved.done,LESSONS.length),known:uniqueIndexes(saved.known,VOCAB.length),days:validDays,bestFull:score(saved.bestFull,70),bestA1:score(saved.bestA1,10),bestA2:score(saved.bestA2,10),lastScore,view:'progress'};
+  const validViews=['home','lessons','grammar','words','practice','exam','progress'];
+  const restoredState={version:3,done:uniqueIndexes(saved.done,LESSONS.length),known:uniqueIndexes(saved.known,VOCAB.length),days:validDays,bestFull:score(saved.bestFull,70),bestA1:score(saved.bestA1,10),bestA2:score(saved.bestA2,10),lastScore,view:validViews.includes(saved.view)?saved.view:'progress'};
   if(!Array.isArray(backup.officialVocabulary)||backup.officialVocabulary.length>5000||!Array.isArray(backup.officialKnown)||backup.officialKnown.length>5000)throw new Error('The vocabulary section of this backup is invalid.');
   const levels=new Set(['Novice 1','Novice 2','A1','A2']);
   const seen=new Set();
@@ -160,6 +178,9 @@ async function restoreProgressBackup(file) {
     state=data.state;
     OFFICIAL_VOCAB=data.words;
     OFFICIAL_KNOWN=new Set(data.known);
+    state.view='progress';
+    persistLocalStudyData();
+    queueCloudSave();
     draw();
     toast('Progress backup restored.');
   } catch(error) {
@@ -184,6 +205,262 @@ function speak(text) {
   utterance.lang = utterance.voice ? utterance.voice.lang : 'zh-TW';
   utterance.rate = Number(document.getElementById('rate')?.value || .82);
   speechSynthesis.speak(utterance);
+}
+function persistLocalStudyData() {
+  try {
+    localStorage.setItem('islandStudyProgress', JSON.stringify(state));
+    localStorage.setItem('tocflOfficialWords', JSON.stringify(OFFICIAL_VOCAB));
+    localStorage.setItem('tocflOfficialKnown', JSON.stringify([...OFFICIAL_KNOWN]));
+    if(cloudUser&&cloudLoadedUser===cloudUser.id)localStorage.setItem(localOwnerKey,cloudUser.id);
+  } catch (_) {}
+}
+function updateCloudStatus(message) {
+  cloudStatusText=message;
+  const status=document.getElementById('cloudStatus');
+  if(status)status.textContent=message;
+}
+function accountSectionMarkup() {
+  if(!cloudConfigured) return `<section class="card account-card"><div class="kicker">YOUR ACCOUNT</div><h3>Continue across your devices</h3><p>Secure sign-in and cloud progress are prepared, but the private database has not been connected yet. Until then, this account panel is unavailable; local progress and JSON backups still work.</p><p id="cloudStatus" class="status" role="status" aria-live="polite">${esc(cloudStatusText)}</p></section>`;
+  if(cloudRecoveryMode) return `<section class="card account-card"><div class="kicker">RESET PASSWORD</div><h3>Choose a new password</h3><form id="newPasswordForm" class="account-form"><label>New password<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><button class="button primary" type="submit">Save new password</button></form><p id="cloudStatus" class="status" role="status" aria-live="polite">${esc(cloudStatusText)}</p></section>`;
+  if(cloudUser) {
+    const displayName=cloudUser.user_metadata?.display_name||'';
+    return `<section class="card account-card"><div class="kicker">SIGNED IN PROFILE</div><h3>Welcome${displayName?' back, '+esc(displayName):''}</h3><p>Account ID: <b>${esc(cloudUser.email||'')}</b> · progress syncs to your account so you can continue on another device.</p><form id="profileForm" class="account-form profile-form"><label>Display name<input name="displayName" type="text" maxlength="40" value="${esc(displayName)}" autocomplete="nickname" required></label><button class="button secondary" type="submit">Save profile</button><button class="smallbtn" id="signOutButton" type="button">Sign out</button></form><p id="cloudStatus" class="status" role="status" aria-live="polite">${esc(cloudStatusText)}</p></section>`;
+  }
+  return `<section class="card account-card"><div class="kicker">YOUR ACCOUNT</div><h3>Sign in to keep your place</h3><p>Use your email address and password. Your display name appears on your profile. Study content is public; your account keeps your own progress private.</p><div class="account-forms"><form id="signUpForm" class="account-form"><h4>Create account</h4><label>Display name<input name="displayName" type="text" maxlength="40" autocomplete="nickname" required></label><label>Email address<input name="email" type="email" autocomplete="email" required></label><label>Password <small>(at least 8 characters)</small><input name="password" type="password" minlength="8" autocomplete="new-password" required></label><button class="button primary" type="submit">Create account</button></form><form id="signInForm" class="account-form"><h4>Sign in</h4><label>Email address<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button class="button secondary" type="submit">Sign in and sync progress</button></form></div><form id="passwordResetForm" class="account-reset"><label>Forgot your password? Enter your email<input name="email" type="email" autocomplete="email" required></label><button class="smallbtn" type="submit">Email a reset link</button></form><p id="cloudStatus" class="status" role="status" aria-live="polite">${esc(cloudStatusText)}</p></section>`;
+}
+function normalizedSnapshot(progress, words, known) {
+  return normalizeProgressBackup({app:'island-study-room',backupVersion:1,progress,officialVocabulary:Array.isArray(words)?words:[],officialKnown:Array.isArray(known)?known:[]});
+}
+function mergeStudySnapshots(local, cloud) {
+  const validViews=['home','lessons','grammar','words','practice','exam','progress'];
+  const hasLocalWork=local.state.done.length||local.state.known.length||local.state.days.length||local.state.bestFull||local.state.bestA1||local.state.bestA2||local.words.length||local.known.length;
+  const latestScore=[local.state.lastScore,cloud.state.lastScore].filter(Boolean).sort((a,b)=>Date.parse(b.date)-Date.parse(a.date))[0]||null;
+  const mergedState={
+    version:3,
+    done:[...new Set([...cloud.state.done,...local.state.done])].sort((a,b)=>a-b),
+    known:[...new Set([...cloud.state.known,...local.state.known])].sort((a,b)=>a-b),
+    days:[...new Set([...cloud.state.days,...local.state.days])].sort().slice(-3650),
+    bestFull:Math.max(cloud.state.bestFull,local.state.bestFull),
+    bestA1:Math.max(cloud.state.bestA1,local.state.bestA1),
+    bestA2:Math.max(cloud.state.bestA2,local.state.bestA2),
+    lastScore:latestScore,
+    view:(hasLocalWork?local.state.view:cloud.state.view),
+  };
+  if(!validViews.includes(mergedState.view))mergedState.view='home';
+  const wordMap=new Map();
+  [...cloud.words,...local.words].forEach(word=>wordMap.set(word.key,word));
+  const words=[...wordMap.values()].slice(0,5000);
+  const validKeys=new Set(words.map(word=>word.key));
+  return {state:mergedState,words,known:[...new Set([...cloud.known,...local.known])].filter(key=>validKeys.has(key))};
+}
+function cloudSignature(snapshot) {
+  const clean=normalizedSnapshot(snapshot.progress,snapshot.officialVocabulary,snapshot.officialKnown);
+  return JSON.stringify({progress:clean.state,officialVocabulary:clean.words,officialKnown:clean.known});
+}
+function currentCloudSnapshot() { return {progress:state,officialVocabulary:OFFICIAL_VOCAB,officialKnown:[...OFFICIAL_KNOWN]}; }
+function mergeCloudRowIntoLocal(row) {
+  const local=normalizedSnapshot(state,OFFICIAL_VOCAB,[...OFFICIAL_KNOWN]);
+  const remote=normalizedSnapshot(row.progress,row.official_vocabulary,row.official_known);
+  const combined=mergeStudySnapshots(local,remote);
+  state=combined.state;
+  OFFICIAL_VOCAB=combined.words;
+  OFFICIAL_KNOWN=new Set(combined.known);
+  cloudRevision=Number(row.revision)||0;
+  persistLocalStudyData();
+  return currentCloudSnapshot();
+}
+function cachedAccountSnapshot(userId) {
+  try {
+    const saved=JSON.parse(localStorage.getItem('tocflProgressCache:'+userId)||'null');
+    if(saved)return normalizedSnapshot(saved.progress,saved.officialVocabulary,saved.officialKnown);
+  } catch (_) {}
+  return null;
+}
+function cacheCurrentAccountSnapshot(userId) {
+  if(!userId)return;
+  try { localStorage.setItem('tocflProgressCache:'+userId,JSON.stringify(currentCloudSnapshot())); } catch (_) {}
+}
+function queueCloudSave(delay=700) {
+  if(!cloudConfigured||!cloudUser||cloudLoadedUser!==cloudUser.id)return;
+  if(cloudSaveTimer)clearTimeout(cloudSaveTimer);
+  cloudSaveTimer=setTimeout(flushCloudSave,delay);
+}
+async function flushCloudSave() {
+  cloudSaveTimer=null;
+  if(!cloudConfigured||!cloudUser||cloudLoadedUser!==cloudUser.id)return;
+  if(cloudSaving){cloudSaveQueued=true;return;}
+  const userId=cloudUser.id;
+  let snapshot=currentCloudSnapshot();
+  if(cloudSignature(snapshot)===cloudLastSnapshot)return;
+  cloudSaving=true;
+  updateCloudStatus('Saving your progress to your account…');
+  try {
+    let savedRow=null;
+    for(let attempt=0;attempt<4;attempt++) {
+      if(cloudUser?.id!==userId)return;
+      const {data,error}=await window.TOCFLCloud.saveProgress(userId,snapshot,cloudRevision);
+      if(error?.code==='23505') {
+        const latest=await window.TOCFLCloud.loadProgress(userId);
+        if(latest.error)throw latest.error;
+        if(cloudUser?.id!==userId)return;
+        if(!latest.data)throw error;
+        snapshot=mergeCloudRowIntoLocal(latest.data);
+        continue;
+      }
+      if(error)throw error;
+      if(data) { savedRow=data; break; }
+      const latest=await window.TOCFLCloud.loadProgress(userId);
+      if(latest.error)throw latest.error;
+      if(cloudUser?.id!==userId)return;
+      if(!latest.data){cloudRevision=0;snapshot=currentCloudSnapshot();continue;}
+      snapshot=mergeCloudRowIntoLocal(latest.data);
+    }
+    if(!savedRow)throw new Error('Progress changed on another device. Please try saving again.');
+    if(cloudUser?.id===userId) {
+      cloudRevision=Number(savedRow.revision)||cloudRevision;
+      snapshot=mergeCloudRowIntoLocal(savedRow);
+      cloudLastSnapshot=cloudSignature({progress:savedRow.progress,officialVocabulary:savedRow.official_vocabulary,officialKnown:savedRow.official_known});
+      updateCloudStatus('Progress synced to your account.');
+      if(cloudSignature(currentCloudSnapshot())!==cloudLastSnapshot)queueCloudSave(100);
+    }
+  } catch(error) {
+    if(cloudUser?.id===userId)updateCloudStatus('Cloud save failed. Your browser copy is safe; check your connection and database setup, then try again.');
+  } finally {
+    cloudSaving=false;
+    if(cloudSaveQueued){cloudSaveQueued=false;queueCloudSave(150);}
+  }
+}
+async function handleCloudAuthChange(user, event) {
+  const previousId=cloudUser?.id;
+  cloudUser=user||null;
+  if(event==='PASSWORD_RECOVERY') {
+    cloudRecoveryMode=true;
+    cloudStatusText='Choose a new password for your account.';
+    if(state.view==='progress')draw();
+    return;
+  }
+  if(!cloudUser) {
+    cloudLoadedUser='';
+    cloudLastSnapshot='';
+    cloudRevision=0;
+    cloudRecoveryMode=false;
+    cloudStatusText='Signed out. Your locally saved progress is still available in this browser.';
+    if(previousId||event==='INITIAL_SESSION')draw();
+    return;
+  }
+  if(cloudLoadedUser===cloudUser.id) {
+    cloudStatusText='Progress synced to your account.';
+    if(event==='SIGNED_IN'||event==='USER_UPDATED')draw();
+    return;
+  }
+  if(cloudLoadingUser===cloudUser.id)return;
+  cloudLoadingUser=cloudUser.id;
+  cloudLoadedUser='';
+  cloudStatusText='Loading your saved progress…';
+  const userId=cloudUser.id;
+  let localOwner='';
+  try {
+    localOwner=localStorage.getItem(localOwnerKey)||'';
+    if(!localOwner)localStorage.setItem(localOwnerKey,userId);
+    if(localOwner&&localOwner!==userId) {
+      cacheCurrentAccountSnapshot(localOwner);
+      const accountCache=cachedAccountSnapshot(userId);
+      state=accountCache?.state||Object.assign({},defaultState,{view:'progress'});
+      OFFICIAL_VOCAB=accountCache?.words||[];
+      OFFICIAL_KNOWN=new Set(accountCache?.known||[]);
+      localStorage.setItem(localOwnerKey,userId);
+      persistLocalStudyData();
+    }
+  } catch (_) {}
+  draw();
+  try {
+    const {data:row,error}=await window.TOCFLCloud.loadProgress(userId);
+    if(error)throw error;
+    const localBelongsToUser=!localOwner||localOwner===userId;
+    const accountCache=!localBelongsToUser?cachedAccountSnapshot(userId):null;
+    const local=accountCache||normalizedSnapshot(localBelongsToUser?state:defaultState,localBelongsToUser?OFFICIAL_VOCAB:[],localBelongsToUser?[...OFFICIAL_KNOWN]:[]);
+    let combined=local;
+    if(row) {
+      const saved=normalizedSnapshot(row.progress,row.official_vocabulary,row.official_known);
+      combined=mergeStudySnapshots(local,saved);
+      cloudRevision=Number(row.revision)||0;
+    } else {
+      cloudRevision=0;
+    }
+    if(cloudUser?.id!==userId)return;
+    state=combined.state;
+    OFFICIAL_VOCAB=combined.words;
+    OFFICIAL_KNOWN=new Set(combined.known);
+    persistLocalStudyData();
+    try { localStorage.setItem(localOwnerKey,userId); } catch (_) {}
+    try { localStorage.removeItem('tocflProgressCache:'+userId); } catch (_) {}
+    cloudLoadedUser=userId;
+    cloudStatusText=row?'Progress loaded and synced with this device.':'Account ready. Saving this device’s progress to your account…';
+    cloudLastSnapshot=row?cloudSignature({progress:row.progress,officialVocabulary:row.official_vocabulary,officialKnown:row.official_known}):'';
+    draw();
+    queueCloudSave(50);
+  } catch(error) {
+    if(cloudUser?.id===userId) {
+      cloudStatusText='Signed in, but progress could not load. Confirm the database table and its row security policies are installed.';
+      cloudLoadedUser='';
+      draw();
+    }
+  } finally {
+    if(cloudLoadingUser===userId)cloudLoadingUser='';
+  }
+}
+async function runAccountForm(form, action) {
+  const button=form.querySelector('button[type="submit"]');
+  const formData=new FormData(form);
+  if(button)button.disabled=true;
+  try {
+    if(action==='signup') {
+      const {data,error}=await window.TOCFLCloud.signUp({email:String(formData.get('email')).trim(),password:String(formData.get('password')),displayName:String(formData.get('displayName')).trim()});
+      if(error)throw error;
+      form.reset();
+      cloudStatusText=data.session?'Account created. Loading your progress…':'Account created. Check your email to confirm it, then sign in.';
+    } else if(action==='signin') {
+      const {error}=await window.TOCFLCloud.signIn(String(formData.get('email')).trim(),String(formData.get('password')));
+      if(error)throw error;
+      form.reset();
+      cloudStatusText='Signed in. Loading your progress…';
+    } else if(action==='reset') {
+      const {error}=await window.TOCFLCloud.sendPasswordReset(String(formData.get('email')).trim());
+      if(error)throw error;
+      form.reset();
+      cloudStatusText='If that address has an account, a password reset link has been sent.';
+    } else if(action==='profile') {
+      const displayName=String(formData.get('displayName')).trim();
+      const {data,error}=await window.TOCFLCloud.updateDisplayName(displayName);
+      if(error)throw error;
+      cloudUser=data.user||window.TOCFLCloud.getUser();
+      cloudStatusText='Profile updated.';
+    } else if(action==='new-password') {
+      const {error}=await window.TOCFLCloud.updatePassword(String(formData.get('password')));
+      if(error)throw error;
+      cloudRecoveryMode=false;
+      cloudStatusText='Password updated. Your account is ready.';
+      form.reset();
+    }
+  } catch(error) {
+    cloudStatusText=error?.message||'That account request could not be completed. Try again.';
+  } finally {
+    if(button)button.disabled=false;
+    draw();
+  }
+}
+function initializeCloud() {
+  if(!window.TOCFLCloud)return;
+  window.TOCFLCloud.initialize(handleCloudAuthChange).then(result=>{
+    cloudConfigured=Boolean(result.configured&&!result.error);
+    if(result.error)cloudStatusText=result.error;
+    else if(!cloudConfigured)cloudStatusText='Cloud sign-in is not connected. Progress stays in this browser until a database is configured.';
+    if(state.view==='progress')draw();
+  }).catch(()=>{
+    cloudConfigured=false;
+    cloudStatusText='Cloud sign-in could not start. Local progress is still available.';
+    if(state.view==='progress')draw();
+  });
 }
 function go(view) {
   if (quizClock) clearInterval(quizClock);
@@ -337,12 +614,13 @@ function pageExam() {
 }
 function pageProgress() {
   const fullScore = state.bestFull ? state.bestFull+'/70' : '—';
-  return `<div class="page-head"><div><div class="kicker">YOUR JOURNEY, SAVED ON THIS DEVICE</div><h1>Small steps add up.</h1><p>Progress saves in this browser. Download a backup to move it to another device or restore it after clearing site data.</p></div><button class="button secondary" data-go="lessons">Continue learning →</button></div><div class="two-col"><section class="card"><h3>Course progress</h3><div class="result-score">${progressPercent()}%</div><div class="track"><i style="width:${progressPercent()}%"></i></div><div class="progress-level"><b>A1 · ${levelDone('A1')}/12</b><div class="track"><i style="width:${levelDone('A1')/12*100}%"></i></div></div><div class="progress-level"><b>A2 · ${levelDone('A2')}/13</b><div class="track"><i style="width:${levelDone('A2')/13*100}%"></i></div></div>${LESSONS.map((lesson,index)=>'<p class="progress-row">'+(state.done.includes(index)?'✓':'○')+'　<span>'+lesson.level+' · '+esc(lesson.title)+'</span></p>').join('')}</section><section class="card"><h3>Study snapshot</h3><p>${state.known.length} core words marked known · ${state.days.length} study days</p><div class="score-grid"><div><b>A1 drill</b><strong>${state.bestA1||'—'}/10</strong></div><div><b>A2 drill</b><strong>${state.bestA2||'—'}/10</strong></div><div><b>Timed practice set</b><strong>${fullScore}</strong></div></div><p>These are practice results, not official scaled scores.</p><button class="clear" id="clearProgress">Reset saved progress</button></section></div><section class="card progress-backup"><div class="kicker">KEEP A COPY OF YOUR PROGRESS</div><h3>Back up or move your study data</h3><p>The backup contains lesson completion, scores, known words and any imported official vocabulary. It is a file you control and is never uploaded to GitHub.</p><div class="backup-actions"><button class="button primary" id="downloadProgressBackup">Download backup JSON</button><input class="backup-file-input" id="progressBackupFile" type="file" accept=".json,application/json" aria-label="Choose a TOCFL progress backup"><label for="progressBackupFile">Restore a backup</label></div><p id="backupStatus" class="status" role="status" aria-live="polite">Before clearing site data, download a backup. On your phone, open this page and choose the backup file. Restore replaces progress currently saved on that device. Keep the file private; it contains your study history.</p></section>`;
+  return `<div class="page-head"><div><div class="kicker">YOUR PROFILE & LEARNING RECORD</div><h1>Small steps add up.</h1><p>Your lessons, practice scores and word review can follow your account across devices. Use a backup as an extra safety copy.</p></div><button class="button secondary" data-go="lessons">Continue learning →</button></div><div class="two-col"><section class="card"><h3>Course progress</h3><div class="result-score">${progressPercent()}%</div><div class="track"><i style="width:${progressPercent()}%"></i></div><div class="progress-level"><b>A1 · ${levelDone('A1')}/12</b><div class="track"><i style="width:${levelDone('A1')/12*100}%"></i></div></div><div class="progress-level"><b>A2 · ${levelDone('A2')}/13</b><div class="track"><i style="width:${levelDone('A2')/13*100}%"></i></div></div>${LESSONS.map((lesson,index)=>'<p class="progress-row">'+(state.done.includes(index)?'✓':'○')+'　<span>'+lesson.level+' · '+esc(lesson.title)+'</span></p>').join('')}</section><section class="card"><h3>Study snapshot</h3><p>${state.known.length} core words marked known · ${state.days.length} study days</p><div class="score-grid"><div><b>A1 drill</b><strong>${state.bestA1||'—'}/10</strong></div><div><b>A2 drill</b><strong>${state.bestA2||'—'}/10</strong></div><div><b>Timed practice set</b><strong>${fullScore}</strong></div></div><p>These are practice results, not official scaled scores.</p><button class="clear" id="clearProgress">Reset saved progress</button></section></div><section class="card progress-backup"><div class="kicker">KEEP A COPY OF YOUR PROGRESS</div><h3>Back up or move your study data</h3><p>The backup contains lesson completion, scores, known words and any imported official vocabulary. It is a file you control and is never uploaded to GitHub.</p><div class="backup-actions"><button class="button primary" id="downloadProgressBackup">Download backup JSON</button><input class="backup-file-input" id="progressBackupFile" type="file" accept=".json,application/json" aria-label="Choose a TOCFL progress backup"><label for="progressBackupFile">Restore a backup</label></div><p id="backupStatus" class="status" role="status" aria-live="polite">Before clearing site data, download a backup. On your phone, open this page and choose the backup file. Restore replaces progress currently saved on that device. Keep the file private; it contains your study history.</p></section>`;
 }
 function draw() {
   const view = state.view || 'home';
   const pages = {home:pageHome,lessons:pageLessons,grammar:pageGrammar,words:pageWords,practice:pagePractice,exam:pageExam,progress:pageProgress};
   document.getElementById('appMain').innerHTML = (pages[view] || pageHome)();
+  if(view==='progress')document.getElementById('appMain').insertAdjacentHTML('afterbegin',accountSectionMarkup());
   if(view==='practice') {
     const summary=document.querySelector('.pinyin-charts .chart-details:nth-child(2) summary');
     if(summary)summary.textContent='Explore all 36 core finals (vowel sounds)';
@@ -556,6 +834,12 @@ function stopRecording() {
   }
 }
 document.body.addEventListener('click',async event=>{
+  if(event.target.closest('#signOutButton')){
+    if(cloudSaveTimer){clearTimeout(cloudSaveTimer);await flushCloudSave();}
+    const {error}=await window.TOCFLCloud.signOut();
+    if(error)updateCloudStatus('Sign out failed. Please try again.');
+    return;
+  }
   let target=event.target.closest('[data-sound-start]');
   if(target){startSoundQuiz(target.dataset.soundStart);return;}
   target=event.target.closest('[data-sound-play]');
@@ -611,7 +895,7 @@ document.body.addEventListener('click',async event=>{
   target=event.target.closest('#importOfficialVocab');
   if(target){await importOfficialVocabulary();return;}
   target=event.target.closest('#clearOfficialVocab');
-  if(target&&confirm('Remove the imported official word list and its recall marks from this browser?')){OFFICIAL_VOCAB=[];OFFICIAL_KNOWN.clear();localStorage.removeItem('tocflOfficialWords');localStorage.removeItem('tocflOfficialKnown');draw();return;}
+  if(target&&confirm('Remove the imported official word list and its recall marks from this browser and your signed-in account?')){OFFICIAL_VOCAB=[];OFFICIAL_KNOWN.clear();localStorage.removeItem('tocflOfficialWords');localStorage.removeItem('tocflOfficialKnown');queueCloudSave();draw();return;}
   target=event.target.closest('[data-word-scope]');
   if(target){document.querySelectorAll('[data-word-scope]').forEach(button=>button.classList.toggle('active',button===target));document.querySelectorAll('[data-cat]').forEach((button,index)=>button.classList.toggle('active',index===0));flashIndex=0;filterWords();return;}
   target=event.target.closest('[data-cat]');
@@ -631,7 +915,14 @@ document.body.addEventListener('click',async event=>{
   if(event.target.closest('#recordPlay')){if(recordedUrl)new Audio(recordedUrl).play();return;}
   if(event.target.closest('[data-restart]')){quiz=null;draw();return;}
   if(event.target.closest('#downloadProgressBackup')){downloadProgressBackup();return;}
-  if(event.target.closest('#clearProgress')&&confirm('Clear course and practice progress saved in this browser?')){if(quizClock)clearInterval(quizClock);localStorage.removeItem('islandStudyProgress');state=Object.assign({},defaultState);draw();}
+  if(event.target.closest('#clearProgress')&&confirm(cloudLoadedUser?'Reset course and practice progress on this device and your signed-in account?':'Clear course and practice progress saved in this browser?')){if(quizClock)clearInterval(quizClock);localStorage.removeItem('islandStudyProgress');state=Object.assign({},defaultState);draw();}
+});
+document.body.addEventListener('submit',async event=>{
+  const actions={signUpForm:'signup',signInForm:'signin',passwordResetForm:'reset',profileForm:'profile',newPasswordForm:'new-password'};
+  const action=actions[event.target.id];
+  if(!action)return;
+  event.preventDefault();
+  await runAccountForm(event.target,action);
 });
 document.body.addEventListener('change',async event=>{
   if(event.target.id==='progressBackupFile')await restoreProgressBackup(event.target.files?.[0]);
@@ -641,3 +932,4 @@ document.body.addEventListener('input',event=>{
   if(event.target.id==='rate'){const label=document.getElementById('rateText');if(label)label.textContent=Number(event.target.value).toFixed(2)+'×';}
 });
 draw();
+initializeCloud();

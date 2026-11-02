@@ -1,6 +1,6 @@
 # 島上 — TOCFL Band A study room
 
-A static Traditional Chinese study app for a complete beginner preparing for TOCFL Band A (A1 and A2). It uses Taiwan Mandarin and Traditional characters, runs without a build step or server, and is published with GitHub Pages.
+A static Traditional Chinese study app for a complete beginner preparing for TOCFL Band A (A1 and A2). It uses Taiwan Mandarin and Traditional characters, runs without an app server, and is published with GitHub Pages.
 
 ## Study features
 
@@ -12,8 +12,8 @@ A static Traditional Chinese study app for a complete beginner preparing for TOC
 - 25 sentence models with Taiwan Mandarin speech playback and optional microphone recording for shadowing
 - Ten-question A1 and A2 mixed listening/reading drills with immediate explanations
 - A timed 35-listening + 35-reading original practice set, with 50 minutes for Listening, 60 minutes for Reading and answer review at the end
-- Local lesson, vocabulary, study-day and practice progress, saved only in the current browser
-- Downloadable JSON backup and restore for moving progress between devices or recovering after site data is cleared
+- Lesson, vocabulary, study-day and practice progress saved locally, with optional Supabase account sync across devices
+- Downloadable JSON backup and restore as an extra recovery copy
 
 ## Important scope
 
@@ -23,7 +23,20 @@ The practice questions are original study material, not official TOCFL questions
 
 The Band A Listening/Reading certificate is the app's exam focus. TOCFL Speaking and Writing are separate tests; the app has sentence shadowing but no full speaking or writing exam practice. Check whether your university or program requires either separately using the official [Speaking test page](https://tocfl.edu.tw/tocfl/index.php/test/speaking) and [Writing test page](https://tocfl.edu.tw/tocfl/index.php/test/writing/list/1).
 
-Audio uses a Chinese (Taiwan) voice supplied by the visitor's browser or operating system when available. Voice availability and quality vary by device. The app does not grade pronunciation. Microphone recording is requested only after pressing Record; recordings stay in the browser tab. Progress is stored in local storage on this device. On the My Progress page, download a JSON backup before clearing site data or switching devices. On another device, open the same site and restore that file. Backups include progress and imported official vocabulary; they are not uploaded to GitHub.
+Audio uses a Chinese (Taiwan) voice supplied by the visitor's browser or operating system when available. Voice availability and quality vary by device. The app does not grade pronunciation. Microphone recording is requested only after pressing Record; recordings stay in the browser tab. Until a Supabase project is connected, progress stays in local storage on that device. JSON backups include progress and imported official vocabulary; they are not uploaded to GitHub.
+
+## Accounts and cross-device progress
+
+The account interface uses Supabase Auth for email-and-password sign-in. The optional display name is a profile label; sign-in uses the email address. Passwords are sent to Supabase Auth and are never stored by this app, in this repository, or in the study-progress table. The database keeps one progress record per account. Row-level security restricts records to their owner. The app also keeps its local copy and merges lesson/word progress when devices sync.
+
+Cloud sync is not active until an owner connects a Supabase project:
+
+1. Create a Supabase project.
+2. Run [`supabase-schema.sql`](supabase-schema.sql) once in its SQL Editor.
+3. In Supabase Authentication URL Configuration, allow `https://prasad29113004.github.io/tocfl-beginner/` as the site and redirect URL.
+4. Put the project's URL and **publishable** key in [`auth-config.js`](auth-config.js). The publishable key is intended for a public browser app; never use a secret or `service_role` key here.
+
+The project URL and publishable key are still needed to activate accounts on the live site. Use a custom SMTP provider before opening account registration to many users; Supabase's default email sender is intended for trials and has a low sending limit.
 
 ## Official TOCFL resources
 
