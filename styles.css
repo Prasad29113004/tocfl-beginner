@@ -171,6 +171,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 @media(max-width:740px){.note-grid,.coverage-grid,.grammar-grid,.grammar-quiz-grid{grid-template-columns:1fr}.sound-practice{grid-template-columns:1fr}.sound-drill-buttons{justify-content:flex-start}.grammar-card>p{min-height:0}.score-guidance{overflow-x:auto}.grammar-level-note{align-items:flex-start;flex-direction:column}}
 .account-card{margin-bottom:14px;border-color:#d6dfd4;background:#f9faf5}
 .account-card>p{max-width:900px;line-height:1.6}
+.account-setup-steps{margin:10px 0;padding-left:21px;color:#607067;font-size:10px;line-height:1.8}
+.account-setup-steps a{color:#376849;font-weight:700}
+.account-setup-note{padding:9px 11px;border-radius:7px;background:#eef1e8}
+.account-jump{display:inline-block;margin:2px 0 10px;color:#376849;font-size:10px;font-weight:700;text-decoration:none}
+.account-jump:hover{text-decoration:underline;text-underline-offset:3px}
 .account-forms{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .account-form{display:grid;align-content:start;gap:9px;padding:13px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
 .account-form h4{margin:0;color:var(--green);font:500 17px var(--serif)}
