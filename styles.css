@@ -105,6 +105,23 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .pinyin-section-head{margin-top:28px}
 @media(max-width:740px){.pinyin-studio{padding:15px}.pinyin-intro{grid-template-columns:1fr}.syllable-model{justify-self:start;min-width:0}.tone-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.tone-card:last-child{grid-column:1/-1}.tone-practice{align-items:flex-start;flex-direction:column}.tone-result{flex-wrap:wrap}.sound-grid{grid-template-columns:repeat(auto-fill,minmax(92px,1fr))}}
 
+/* Clear exam-plan action and picture-supported practice prompts */
+.hero .text-link{padding:10px 13px;border:1px solid #f2e4c759;border-radius:8px;background:#ffffff0d;color:#fff4dc;text-decoration:none}
+.hero .text-link span{width:22px;height:22px;display:grid;place-items:center;border-radius:50%;background:#f2e4c72b;color:#fff4dc;font-size:14px}
+.hero .text-link:hover{background:#ffffff1a;color:#fff}
+.hero .text-link:focus-visible,.button:focus-visible,.smallbtn:focus-visible,.nav:focus-visible{outline:3px solid #e9b758;outline-offset:3px}
+.scene{display:flex;align-items:center;gap:12px;min-height:76px}
+.scene-icon,.picture-icon{flex:none;display:grid;place-items:center;border:1px solid #eadfc7;border-radius:12px;background:#fffaf0;color:#315b49}
+.scene-icon{width:58px;height:58px;font-size:34px}
+.picture-prompt{display:flex;align-items:center;gap:11px;margin:12px 0 8px;padding:10px;border:1px solid #e7e3d7;border-radius:10px;background:#f7f5ed}
+.picture-icon{width:60px;height:60px;font-size:34px}
+.picture-prompt .quiz-prompt{flex:1;margin:0;background:transparent;padding:6px}
+.task-family-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
+.task-family-grid>div{padding:11px;background:#f5f4ec;border:1px solid var(--line);border-radius:8px}
+.task-family-grid h4{margin:0 0 7px;font:600 11px var(--mono);color:var(--green)}
+.task-family-grid ul{margin:0;padding-left:17px;line-height:1.8}
+@media(max-width:740px){.task-family-grid{grid-template-columns:1fr}.scene-icon,.picture-icon{width:50px;height:50px;font-size:29px}}
+
 /* Beginner grammar guide and fuller sound practice */
 .pinyin-notes,.sound-practice{margin-top:10px;padding:16px}
 .pinyin-notes h3,.sound-practice h3,.score-guidance h4{font:500 19px var(--serif);margin:3px 0 9px}
