@@ -1,4 +1,4 @@
-(() => {
+window.TOCFLCloud = (() => {
   const config = window.TOCFL_AUTH_CONFIG || {};
   let client = null;
   let user = null;
@@ -6,7 +6,20 @@
   let initError = '';
 
   function configured() {
-    return Boolean(config.supabaseUrl && config.publishableKey && /^https:\/\//i.test(config.supabaseUrl));
+    return Boolean(String(config.supabaseUrl||'').trim() && String(config.publishableKey||'').trim());
+  }
+
+  function isPublicKey(value) {
+    const key=String(value||'').trim();
+    if(/^sb_publishable_[A-Za-z0-9_-]+$/.test(key))return true;
+    const payload=key.split('.')[1];
+    if(!payload||typeof window.atob!=='function')return false;
+    try {
+      let encoded=payload.replace(/-/g,'+').replace(/_/g,'/');
+      encoded+='='.repeat((4-encoded.length%4)%4);
+      const decoded=window.atob(encoded);
+      return JSON.parse(decoded).role==='anon';
+    } catch (_) { return false; }
   }
 
   function getClient() { return client; }
@@ -16,12 +29,25 @@
   async function initialize(callback) {
     onAuthChange = typeof callback === 'function' ? callback : () => {};
     if (!configured()) return { configured: false };
+    const projectUrl=String(config.supabaseUrl).trim().replace(/\/+$/,'');
+    const publishableKey=String(config.publishableKey).trim();
+    try {
+      const url=new URL(projectUrl);
+      if(url.protocol!=='https:'||!url.hostname)throw new Error('invalid URL');
+    } catch (_) {
+      initError='The Supabase project URL is invalid. Use its HTTPS Project URL.';
+      return { configured: true, error: initError };
+    }
+    if(!isPublicKey(publishableKey)) {
+      initError='Use the Supabase publishable key or legacy anon key. Secret and service_role keys are blocked from the browser.';
+      return { configured: true, error: initError };
+    }
     if (!window.supabase?.createClient) {
       initError = 'The sign-in service could not load. Check your internet connection and reload.';
       return { configured: true, error: initError };
     }
     try {
-      client = window.supabase.createClient(config.supabaseUrl, config.publishableKey, {
+      client = window.supabase.createClient(projectUrl, publishableKey, {
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
       });
       const { data, error } = await client.auth.getSession();
