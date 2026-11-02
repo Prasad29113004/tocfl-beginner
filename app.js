@@ -102,6 +102,73 @@ function logDay() {
   if (!state.days.includes(day)) state.days.push(day);
   save();
 }
+function makeProgressBackup() {
+  return { app:'island-study-room', backupVersion:1, exportedAt:new Date().toISOString(), progress:state, officialVocabulary:OFFICIAL_VOCAB, officialKnown:[...OFFICIAL_KNOWN] };
+}
+function downloadProgressBackup() {
+  const blob=new Blob([JSON.stringify(makeProgressBackup(),null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;
+  link.download='tocfl-beginner-progress-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const status=document.getElementById('backupStatus');
+  if(status)status.textContent='Backup downloaded. Keep this JSON file somewhere outside this browser.';
+}
+function normalizeProgressBackup(backup) {
+  if(!backup||backup.app!=='island-study-room'||backup.backupVersion!==1)throw new Error('This is not a TOCFL study-room backup file.');
+  const saved=backup.progress;
+  if(!saved||saved.version!==3||!Array.isArray(saved.done)||!Array.isArray(saved.known)||!Array.isArray(saved.days))throw new Error('The backup is incomplete or uses an unsupported version.');
+  const uniqueIndexes=(values,max)=>[...new Set(values.filter(value=>Number.isInteger(value)&&value>=0&&value<max))];
+  const validDays=[...new Set(saved.days.filter(value=>typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)))].slice(-3650);
+  const score=(value,max)=>Number.isInteger(value)?Math.min(max,Math.max(0,value)):0;
+  const validModes=['A1','A2','full'];
+  const last=saved.lastScore;
+  const lastScore=last&&validModes.includes(last.mode)&&Number.isInteger(last.score)&&Number.isInteger(last.total)&&typeof last.date==='string'
+    ?{mode:last.mode,score:score(last.score,70),total:score(last.total,70),date:last.date.slice(0,40)}:null;
+  const restoredState={version:3,done:uniqueIndexes(saved.done,LESSONS.length),known:uniqueIndexes(saved.known,VOCAB.length),days:validDays,bestFull:score(saved.bestFull,70),bestA1:score(saved.bestA1,10),bestA2:score(saved.bestA2,10),lastScore,view:'progress'};
+  if(!Array.isArray(backup.officialVocabulary)||backup.officialVocabulary.length>5000||!Array.isArray(backup.officialKnown)||backup.officialKnown.length>5000)throw new Error('The vocabulary section of this backup is invalid.');
+  const levels=new Set(['Novice 1','Novice 2','A1','A2']);
+  const seen=new Set();
+  const words=backup.officialVocabulary.map(word=>{
+    if(!word||word.source!=='official'||!levels.has(word.level)||typeof word.h!=='string'||!word.h||typeof word.p!=='string'||!word.p||word.key!==word.level+'|'+word.h)throw new Error('The vocabulary section of this backup is invalid.');
+    if(word.h.length>80||word.p.length>120||(word.context||'').length>2000||(word.pos||'').length>300)throw new Error('The vocabulary section contains an invalid entry.');
+    if(seen.has(word.key))throw new Error('The backup contains duplicate vocabulary entries.');
+    seen.add(word.key);
+    return {source:'official',key:word.key,level:word.level,h:word.h,p:word.p,context:typeof word.context==='string'?word.context:'',pos:typeof word.pos==='string'?word.pos:'',c:word.level,m:''};
+  });
+  const known=[...new Set(backup.officialKnown.filter(key=>typeof key==='string'&&seen.has(key)))];
+  return {state:restoredState,words,known};
+}
+async function restoreProgressBackup(file) {
+  const status=document.getElementById('backupStatus');
+  if(!file)return;
+  try {
+    if(file.size>4*1024*1024)throw new Error('This backup is larger than 4 MB and cannot be imported.');
+    const data=normalizeProgressBackup(JSON.parse(await file.text()));
+    if(!confirm('Restore this backup? It will replace progress and imported vocabulary currently saved in this browser.'))return;
+    const entries=[['islandStudyProgress',JSON.stringify(data.state)],['tocflOfficialWords',JSON.stringify(data.words)],['tocflOfficialKnown',JSON.stringify(data.known)]];
+    const previous=entries.map(([key])=>[key,localStorage.getItem(key)]);
+    try { entries.forEach(([key,value])=>localStorage.setItem(key,value)); }
+    catch(error) {
+      previous.forEach(([key,value])=>{try{if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}catch(_){}});
+      throw new Error('The browser could not store this backup. Free some site storage and try again.');
+    }
+    state=data.state;
+    OFFICIAL_VOCAB=data.words;
+    OFFICIAL_KNOWN=new Set(data.known);
+    draw();
+    toast('Progress backup restored.');
+  } catch(error) {
+    if(status)status.textContent=error.message||'Could not read this backup file.';
+  } finally {
+    const input=document.getElementById('progressBackupFile');
+    if(input)input.value='';
+  }
+}
 function toast(message) {
   const node = document.getElementById('toast');
   node.textContent = message;
@@ -270,7 +337,7 @@ function pageExam() {
 }
 function pageProgress() {
   const fullScore = state.bestFull ? state.bestFull+'/70' : '—';
-  return '<div class="page-head"><div><div class="kicker">YOUR JOURNEY, SAVED ON THIS DEVICE</div><h1>Small steps add up.</h1><p>Lesson progress, known words and practice records stay in this browser.</p></div><button class="button secondary" data-go="lessons">Continue learning →</button></div><div class="two-col"><section class="card"><h3>Course progress</h3><div class="result-score">'+progressPercent()+'%</div><div class="track"><i style="width:'+progressPercent()+'%"></i></div><div class="progress-level"><b>A1 · '+levelDone('A1')+'/12</b><div class="track"><i style="width:'+(levelDone('A1')/12*100)+'%"></i></div></div><div class="progress-level"><b>A2 · '+levelDone('A2')+'/13</b><div class="track"><i style="width:'+(levelDone('A2')/13*100)+'%"></i></div></div>'+LESSONS.map((lesson,index)=>'<p class="progress-row">'+(state.done.includes(index)?'✓':'○')+'　<span>'+lesson.level+' · '+esc(lesson.title)+'</span></p>').join('')+'</section><section class="card"><h3>Study snapshot</h3><p>'+state.known.length+' core words marked known · '+state.days.length+' study days</p><div class="score-grid"><div><b>A1 drill</b><strong>'+(state.bestA1||'—')+'/10</strong></div><div><b>A2 drill</b><strong>'+(state.bestA2||'—')+'/10</strong></div><div><b>Timed practice set</b><strong>'+fullScore+'</strong></div></div><p>These are practice results, not official scaled scores.</p><button class="clear" id="clearProgress">Reset saved progress</button></section></div>';
+  return `<div class="page-head"><div><div class="kicker">YOUR JOURNEY, SAVED ON THIS DEVICE</div><h1>Small steps add up.</h1><p>Progress saves in this browser. Download a backup to move it to another device or restore it after clearing site data.</p></div><button class="button secondary" data-go="lessons">Continue learning →</button></div><div class="two-col"><section class="card"><h3>Course progress</h3><div class="result-score">${progressPercent()}%</div><div class="track"><i style="width:${progressPercent()}%"></i></div><div class="progress-level"><b>A1 · ${levelDone('A1')}/12</b><div class="track"><i style="width:${levelDone('A1')/12*100}%"></i></div></div><div class="progress-level"><b>A2 · ${levelDone('A2')}/13</b><div class="track"><i style="width:${levelDone('A2')/13*100}%"></i></div></div>${LESSONS.map((lesson,index)=>'<p class="progress-row">'+(state.done.includes(index)?'✓':'○')+'　<span>'+lesson.level+' · '+esc(lesson.title)+'</span></p>').join('')}</section><section class="card"><h3>Study snapshot</h3><p>${state.known.length} core words marked known · ${state.days.length} study days</p><div class="score-grid"><div><b>A1 drill</b><strong>${state.bestA1||'—'}/10</strong></div><div><b>A2 drill</b><strong>${state.bestA2||'—'}/10</strong></div><div><b>Timed practice set</b><strong>${fullScore}</strong></div></div><p>These are practice results, not official scaled scores.</p><button class="clear" id="clearProgress">Reset saved progress</button></section></div><section class="card progress-backup"><div class="kicker">KEEP A COPY OF YOUR PROGRESS</div><h3>Back up or move your study data</h3><p>The backup contains lesson completion, scores, known words and any imported official vocabulary. It is a file you control and is never uploaded to GitHub.</p><div class="backup-actions"><button class="button primary" id="downloadProgressBackup">Download backup JSON</button><input class="backup-file-input" id="progressBackupFile" type="file" accept=".json,application/json" aria-label="Choose a TOCFL progress backup"><label for="progressBackupFile">Restore a backup</label></div><p id="backupStatus" class="status" role="status" aria-live="polite">Before clearing site data, download a backup. On your phone, open this page and choose the backup file. Restore replaces progress currently saved on that device. Keep the file private; it contains your study history.</p></section>`;
 }
 function draw() {
   const view = state.view || 'home';
@@ -563,11 +630,14 @@ document.body.addEventListener('click',async event=>{
   if(event.target.closest('#recordStop')){stopRecording();return;}
   if(event.target.closest('#recordPlay')){if(recordedUrl)new Audio(recordedUrl).play();return;}
   if(event.target.closest('[data-restart]')){quiz=null;draw();return;}
+  if(event.target.closest('#downloadProgressBackup')){downloadProgressBackup();return;}
   if(event.target.closest('#clearProgress')&&confirm('Clear course and practice progress saved in this browser?')){if(quizClock)clearInterval(quizClock);localStorage.removeItem('islandStudyProgress');state=Object.assign({},defaultState);draw();}
+});
+document.body.addEventListener('change',async event=>{
+  if(event.target.id==='progressBackupFile')await restoreProgressBackup(event.target.files?.[0]);
 });
 document.body.addEventListener('input',event=>{
   if(event.target.id==='wordSearch')filterWords();
   if(event.target.id==='rate'){const label=document.getElementById('rateText');if(label)label.textContent=Number(event.target.value).toFixed(2)+'×';}
 });
 draw();
-

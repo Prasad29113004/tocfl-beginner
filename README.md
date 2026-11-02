@@ -13,6 +13,7 @@ A static Traditional Chinese study app for a complete beginner preparing for TOC
 - Ten-question A1 and A2 mixed listening/reading drills with immediate explanations
 - A timed 35-listening + 35-reading original practice set, with 50 minutes for Listening, 60 minutes for Reading and answer review at the end
 - Local lesson, vocabulary, study-day and practice progress, saved only in the current browser
+- Downloadable JSON backup and restore for moving progress between devices or recovering after site data is cleared
 
 ## Important scope
 
@@ -22,7 +23,7 @@ The practice questions are original study material, not official TOCFL questions
 
 The Band A Listening/Reading certificate is the app's exam focus. TOCFL Speaking and Writing are separate tests; the app has sentence shadowing but no full speaking or writing exam practice. Check whether your university or program requires either separately using the official [Speaking test page](https://tocfl.edu.tw/tocfl/index.php/test/speaking) and [Writing test page](https://tocfl.edu.tw/tocfl/index.php/test/writing/list/1).
 
-Audio uses a Chinese (Taiwan) voice supplied by the visitor's browser or operating system when available. Voice availability and quality vary by device. The app does not grade pronunciation. Microphone recording is requested only after pressing Record; recordings stay in the browser tab. Progress is stored in local storage on this device.
+Audio uses a Chinese (Taiwan) voice supplied by the visitor's browser or operating system when available. Voice availability and quality vary by device. The app does not grade pronunciation. Microphone recording is requested only after pressing Record; recordings stay in the browser tab. Progress is stored in local storage on this device. On the My Progress page, download a JSON backup before clearing site data or switching devices. On another device, open the same site and restore that file. Backups include progress and imported official vocabulary; they are not uploaded to GitHub.
 
 ## Official TOCFL resources
 
@@ -40,4 +41,3 @@ This repository includes a GitHub Actions workflow to publish the static site on
 Live site: https://prasad29113004.github.io/tocfl-beginner/
 
 The Excel import uses SheetJS Community Edition from its official CDN only after the visitor chooses Import. The workbook itself stays in the browser. See [SheetJS documentation](https://docs.sheetjs.com/docs/solutions/input/) for the import method.
-
